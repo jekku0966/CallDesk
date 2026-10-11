@@ -2,7 +2,7 @@
 
 A Vencord userplugin that exposes **Answer / Decline / Hang Up** to Stream Deck through an authenticated local HTTP bridge. No overlay, hotkey emulation or window focus switching. Works by asking the running Discord renderer to perform call actions.
 
-**Release status:** alpha source release. Native bridge automated tests and Vencord build validation are recorded in VALIDATION.md. The author reports successful live Answer and Hang Up tests on Windows with official Discord + a custom Vencord build (11 October 2026). Decline, group calls and Vesktop compatibility still need separate live verification.
+**Release status:** alpha source release. Native bridge automated tests and Vencord build validation are recorded in VALIDATION.md. The author reports successful live Answer, Decline and Hang Up tests on Windows with official Discord + a custom Vencord build (11 October 2026). Group calls and Vesktop compatibility still need separate live verification.
 
 ## Install on Windows
 
@@ -66,9 +66,11 @@ Static PNG and animated GIF button artwork is included in `icons/`; see `icons/R
 
 Have a friend call you; no outgoing call is placed automatically by this plugin.
 
-- [ ] Incoming DM: minimized/overlay-off conditions not separately recorded (Answer itself reported working).
+- [x] Answer: incoming-call action reported working.
+- [ ] Answer with Discord minimized and overlay off: conditions not separately recorded.
 - [ ] Incoming group DM: answer and verify expected participants.
-- [ ] Decline DM: ringing stops for you; caller behavior recorded.
+- [x] Decline: Stream Deck action reported working.
+- [ ] Decline caller-side behavior: effects not separately recorded.
 - [ ] Decline group DM: other recipients still ring.
 - [x] Hang Up: current call disconnect and earlier server-voice disconnect reported working.
 - [ ] Connected server voice plus incoming DM: answer returns 409, decline still works.
