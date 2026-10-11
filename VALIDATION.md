@@ -4,12 +4,14 @@
 
 - Windows Stream Deck companion installed and used with official Discord + custom Vencord.
 - Incoming-call Answer works.
+- Decline works.
+- All three Stream Deck actions are reported working as intended.
 - Hang Up works; earlier server voice-channel Hang Up also reported working.
 - Updated Vencord build restores ServerInfo Friends and retains CallDeck functionality.
 
 Exact Discord, Stream Deck and updated Vencord commit versions were not recorded. This repository packages the existing local CallDeck source; the source on the author's Windows PC was not byte-compared against it. Live results are reported observations, not independent testing by the packaging environment.
 
-Not yet separately documented: Decline behavior, incoming group calls, simultaneous calls, sleep/wake, Vesktop on the updated source and hardware animation details.
+Not yet separately documented: caller-side effects of Decline, incoming group calls, simultaneous calls, sleep/wake, Vesktop on the updated source and hardware animation details.
 
 ## Automated packaging checks — 11 October 2026
 
