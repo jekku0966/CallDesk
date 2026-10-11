@@ -48,10 +48,10 @@ npx @elgato/cli@1.10.1 validate com.nks.calldeck.sdPlugin
 npx @elgato/cli@1.10.1 pack com.nks.calldeck.sdPlugin
 ```
 
-The installer was created with the official Elgato CLI. Manifest SDK version 2; Node 20 is supplied by Stream Deck. This is an independent alpha, not an Elgato Marketplace release. Generated artwork and the CallDeck source are GPL-3.0-or-later; vendored third-party code retains its MIT license. Implementation was generated with Codex assistance. The author reports successful installation and live Answer and Hang Up tests; Decline and the remaining edge cases need live verification.
+The installer was created with the official Elgato CLI. Manifest SDK version 2; Node 20 is supplied by Stream Deck. This is an independent alpha, not an Elgato Marketplace release. Generated artwork and the CallDeck source are GPL-3.0-or-later; vendored third-party code retains its MIT license. Implementation was generated with Codex assistance. The author reports successful installation and live Answer, Decline and Hang Up tests; group-call and other edge cases need separate live verification.
 
 ## Validation
 
 Four automated tests pass: configuration/eligibility, authenticated HTTP/error/timeout behavior, an actual spawned plugin process against simulated Stream Deck WebSocket and bridge HTTP servers, and property-inspector save/status behavior. Checks cover idle/ringing transitions, shared settings, duplicate clicks, unavailable actions, and polling shutdown when keys disappear.
 
-Official Elgato CLI validation and packaging passed. Installer contents and animation PNG decoding were checked. On 11 October 2026 the author reported that installation, live Answer and Hang Up work as intended. Hardware animation details, Decline and group-call edge cases were not separately documented. These are user-reported results; automated tests do not establish them.
+Official Elgato CLI validation and packaging passed. Installer contents and animation PNG decoding were checked. On 11 October 2026 the author reported that installation and all three Stream Deck actions (Answer, Decline and Hang Up) work as intended. Hardware animation details and group-call edge cases were not separately documented. These are user-reported results; automated tests do not establish them.
