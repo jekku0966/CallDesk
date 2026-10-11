@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.streamDeckPlugin
+*.zip
+*.log
+.env
+.env.*
+!.env.example
+Thumbs.db
+.DS_Store

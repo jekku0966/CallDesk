@@ -1,0 +1,79 @@
+{
+    "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+    "Actions": [
+        {
+            "UUID": "com.nks.calldeck.answer",
+            "Name": "Answer",
+            "Icon": "imgs/answer-action",
+            "Tooltip": "Answer the current Discord call",
+            "Controllers": [
+                "Keypad"
+            ],
+            "SupportedInMultiActions": false,
+            "States": [
+                {
+                    "Image": "imgs/answer",
+                    "ShowTitle": false
+                }
+            ],
+            "UserTitleEnabled": false
+        },
+        {
+            "UUID": "com.nks.calldeck.decline",
+            "Name": "Decline",
+            "Icon": "imgs/decline-action",
+            "Tooltip": "Decline the current Discord call",
+            "Controllers": [
+                "Keypad"
+            ],
+            "SupportedInMultiActions": false,
+            "States": [
+                {
+                    "Image": "imgs/decline",
+                    "ShowTitle": false
+                }
+            ],
+            "UserTitleEnabled": false
+        },
+        {
+            "UUID": "com.nks.calldeck.hangup",
+            "Name": "Hang Up",
+            "Icon": "imgs/hangup-action",
+            "Tooltip": "Hang Up the current Discord call",
+            "Controllers": [
+                "Keypad"
+            ],
+            "SupportedInMultiActions": false,
+            "States": [
+                {
+                    "Image": "imgs/hangup",
+                    "ShowTitle": false
+                }
+            ],
+            "UserTitleEnabled": false
+        }
+    ],
+    "Author": "NKS",
+    "Name": "CallDeck",
+    "Category": "CallDeck",
+    "CategoryIcon": "imgs/answer-action",
+    "Description": "Answer, decline and hang up through the local CallDeck Vencord bridge.",
+    "UUID": "com.nks.calldeck",
+    "Version": "0.1.0.0",
+    "SDKVersion": 2,
+    "Software": {
+        "MinimumVersion": "6.6"
+    },
+    "Nodejs": {
+        "Version": "20"
+    },
+    "OS": [
+        {
+            "Platform": "windows",
+            "MinimumVersion": "10"
+        }
+    ],
+    "CodePath": "bin/plugin.cjs",
+    "Icon": "imgs/plugin",
+    "PropertyInspectorPath": "ui/settings.html"
+}
