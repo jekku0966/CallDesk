@@ -4,7 +4,7 @@ Answer, decline and hang up Discord calls from Stream Deck. No overlay or keyboa
 
 CallDeck has two parts: a Vencord userplugin that controls the running Discord client, and a Stream Deck companion with call-state icons. Answer and Decline rattle while a single incoming call is ringing; Hang Up lights up when connected.
 
-**Status: v0.1.0-alpha.** The author reports successful Windows installation and live Answer and Hang Up tests with official Discord + a custom Vencord build (11 October 2026). Decline, group-call behavior and simultaneous calls still need live verification. See [VALIDATION.md](VALIDATION.md).
+**Status: v0.1.0-alpha.** The author reports successful Windows installation and live Answer, Decline and Hang Up tests with official Discord + a custom Vencord build (11 October 2026). Group-call behavior and simultaneous calls still need separate live verification. See [VALIDATION.md](VALIDATION.md).
 
 ## Install the Vencord plugin
 
@@ -108,4 +108,4 @@ Bridge tests require Node 24+. Vencord integration checks run inside a Vencord s
 
 ## License and provenance
 
-GPL-3.0-or-later; see [LICENSE](LICENSE). Vendored dependencies retain their licenses. Code was developed with Codex assistance; live Answer and Hang Up behavior was tested by the author. Artwork was generated with OpenAI image generation. CallDeck is independent and is not endorsed by Discord, Vencord or Elgato.
+GPL-3.0-or-later; see [LICENSE](LICENSE). Vendored dependencies retain their licenses. Code was developed with Codex assistance; all three Stream Deck actions were live-tested by the author. Artwork was generated with OpenAI image generation. CallDeck is independent and is not endorsed by Discord, Vencord or Elgato.
