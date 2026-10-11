@@ -1,16 +1,27 @@
 # CallDeck
 
-Answer, decline and hang up Discord calls from Stream Deck. No overlay or keyboard shortcuts.
+I wanted proper Answer and Decline buttons for Discord on my Stream Deck. That somehow turned into this project.
 
-CallDeck has two parts: a Vencord userplugin that controls the running Discord client, and a Stream Deck companion with call-state icons. Answer and Decline rattle while a single incoming call is ringing; Hang Up lights up when connected.
+CallDeck lets you answer, decline and hang up calls without Discord's overlay or keyboard shortcuts. It uses a Vencord userplugin and a Stream Deck companion. Answer and Decline animate when a single incoming call is ringing, and Hang Up lights up when you're connected.
 
-**Status: v0.1.0-alpha.** The author reports successful Windows installation and live Answer, Decline and Hang Up tests with official Discord + a custom Vencord build (11 October 2026). Group-call behavior and simultaneous calls still need separate live verification. See [VALIDATION.md](VALIDATION.md).
+It's currently `v0.1.0-alpha`. I've tested all three actions on my Windows setup with official Discord and a custom Vencord build. They work. Group calls and simultaneous incoming calls still need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
+
+## What you need
+
+- Windows 10 or newer.
+- Stream Deck 6.6 or newer.
+- Git, Node.js and Corepack to build and install it.
+- A custom Vencord build with CallDeck included.
+
+CallDeck isn't in Vencord's official plugin list. You need to build it from source. Browser Discord won't work because the local bridge needs Node.js.
 
 ## Install the Vencord plugin
 
-Requires Git, Node.js and Corepack. This is an independent userplugin, not part of the official Vencord plugin catalogue. Browser Discord is unsupported because the bridge needs Node.js.
+Download or clone this repo, then open PowerShell in its folder.
 
-Download or clone this repository first. Fully quit Discord, including its system-tray process. From this repository's folder, run the following in PowerShell. It makes a separate Vencord checkout under your local application data and stops on failure:
+Fully quit Discord first, including the tray process. Closing the window isn't enough.
+
+Paste this block. It creates a separate Vencord checkout under your local application data and stops if something fails:
 
 ```powershell
 & {
@@ -45,31 +56,39 @@ Download or clone this repository first. Fully quit Discord, including its syste
 }
 ```
 
-For an existing custom checkout, copy `vencord/callDeck` into its `src/userplugins/callDeck`, then build and inject from that checkout. See [Vencord's custom plugin guide](https://docs.vencord.dev/installing/custom-plugins/).
+Already have a custom Vencord checkout? Copy `vencord/callDeck` into `src/userplugins/callDeck`, then build and inject from there. [Vencord's custom plugin guide](https://docs.vencord.dev/installing/custom-plugins/) covers that setup.
 
-Generate a bridge password:
+Generate a password for the local bridge:
 
 ```powershell
 powershell.exe -NoProfile -File .\vencord\scripts\New-CallDeckToken.ps1
 ```
 
-Reopen Discord. In **Settings → Vencord → Plugins → CallDeck**, set `accessToken` to that generated value and keep `port` at `9473`. Enable CallDeck and fully restart Discord. This is a local bridge password, **never your Discord account token**.
+Reopen Discord and go to **Settings → Vencord → Plugins → CallDeck**.
 
-## Install the Stream Deck companion
+Set `accessToken` to the generated value. Leave `port` at `9473`, enable CallDeck and fully restart Discord.
 
-Build the installer from the included source:
+**Use the generated bridge password. Never put your Discord account token here.**
+
+## Install the Stream Deck plugin
+
+From this repo's folder, build the installer:
 
 ```powershell
 npx.cmd --yes @elgato/cli@1.10.1 pack .\streamdeck\com.nks.calldeck.sdPlugin
 ```
 
-Double-click the resulting `com.nks.calldeck.streamDeckPlugin`. Requires Windows 10+ and Stream Deck 6.6+. Stream Deck supplies Node for running the installed companion.
+Double-click the resulting `com.nks.calldeck.streamDeckPlugin` file to install it. Stream Deck supplies Node for running the plugin.
 
-Drag **CallDeck → Answer**, **Decline** and **Hang Up** onto keys. Select any CallDeck key, enter the same bridge token and port, then click **Save & test**. Settings are shared across CallDeck keys. Static and animated artwork is included; no manual icon assignment is needed. See the [companion documentation](streamdeck/README.md).
+Drag the CallDeck Answer, Decline and Hang Up actions onto your keys. Select any one of them, enter the same bridge token and port, then click **Save & test**.
 
-## Updates
+Those settings apply to all CallDeck keys. The icons are included and change with the call state, so you don't need to assign them manually. There's more detail in the [Stream Deck README](streamdeck/README.md).
 
-Discord internals change, so a custom Vencord build occasionally needs rebuilding. Automatic Vencord updates are disabled by the build command above to keep CallDeck included. Fully quit Discord, then run this against your own checkout (replace the path if you used another location):
+## Updating it
+
+Discord changes its internals, which can break a custom Vencord build. The install command disables automatic Vencord updates so CallDeck stays included. You'll need to update and rebuild that checkout yourself.
+
+Fully quit Discord, then run this. Change the path if you installed somewhere else:
 
 ```powershell
 & {
@@ -88,13 +107,21 @@ Discord internals change, so a custom Vencord build occasionally needs rebuildin
 }
 ```
 
-This updates Vencord, not CallDeck's source. To update CallDeck itself, copy the newer `vencord/callDeck` folder into your checkout before rebuilding. Reopen Discord and verify the call actions afterward.
+That updates Vencord. To update CallDeck's source too, copy the newer `vencord/callDeck` folder into your checkout before rebuilding.
 
-## How it works
+Reopen Discord and check the buttons afterward.
 
-The bridge listens only on `127.0.0.1`, requires a generated 256-bit password, and exposes `GET /status` plus `POST /answer`, `/decline` and `/hangup`. The companion polls status and sends actions only on button presses. No Discord account token is extracted. Passwords are stored in Vencord and Stream Deck settings without added encryption; keep those settings out of public uploads.
+## What the bridge does
 
-Answer refuses ambiguous simultaneous calls and does not switch away from another connected voice channel. Decline requests that Discord stop ringing for the current user. Hang Up disconnects the current voice channel, including server voice. An accepted command means dispatched, not necessarily connected; check Discord for its result.
+It listens on `127.0.0.1` and uses a generated 256-bit password. The endpoints are `GET /status` and `POST /answer`, `/decline` and `/hangup`.
+
+The Stream Deck plugin polls for call status. It sends call actions when you press a button.
+
+Answer refuses multiple incoming calls and won't pull you out of another voice channel. Decline asks Discord to stop ringing for you. Hang Up disconnects the current voice channel, including a server voice channel.
+
+A successful response means the command was dispatched. It doesn't confirm that the voice connection has finished connecting.
+
+CallDeck doesn't extract your Discord account token. The bridge password is stored in Vencord and Stream Deck settings without added encryption, so keep those settings out of public uploads.
 
 ## Development
 
@@ -104,8 +131,12 @@ node --test streamdeck/tests/plugin.test.cjs
 npx @elgato/cli@1.10.1 validate streamdeck/com.nks.calldeck.sdPlugin
 ```
 
-Bridge tests require Node 24+. Vencord integration checks run inside a Vencord source checkout. The WebSocket dependency `ws` is vendored with its MIT license.
+The bridge tests need Node 24 or newer. Vencord integration checks run inside a Vencord source checkout. The `ws` dependency is included with its MIT license.
 
-## License and provenance
+## License
 
-GPL-3.0-or-later; see [LICENSE](LICENSE). Vendored dependencies retain their licenses. Code was developed with Codex assistance; all three Stream Deck actions were live-tested by the author. Artwork was generated with OpenAI image generation. CallDeck is independent and is not endorsed by Discord, Vencord or Elgato.
+GPL-3.0-or-later. See [LICENSE](LICENSE). Included dependencies keep their own licenses.
+
+Built with Codex assistance and live-tested on my own setup. The artwork was generated with OpenAI image generation.
+
+CallDeck is an independent project. It isn't endorsed by Discord, Vencord or Elgato.
