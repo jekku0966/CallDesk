@@ -14,20 +14,28 @@ function validateStatus(s) {
         || !(s.connected === null || (typeof s.connected === 'string' && /^\d+$/.test(s.connected)))) {
         throw new Error('Unexpected bridge status.');
     }
+    if ((s.selected !== undefined && s.selected !== null && (typeof s.selected !== 'string' || !/^\d{1,22}$/.test(s.selected)))
+        || (s.voice !== undefined && !['idle', 'connecting', 'connected', 'error', 'unknown'].includes(s.voice))
+        || (s.operation !== undefined && s.operation !== null && !['answer', 'decline', 'hangup'].includes(s.operation))
+        || (s.session !== undefined && (typeof s.session !== 'string' || !Number.isSafeInteger(s.revision) || s.revision < 0))) {
+        throw new Error('Unexpected bridge synchronization metadata.');
+    }
     return s;
 }
 function available(action, status) {
     if (!status) return false;
-    if (action === 'hangup') return status.connected !== null;
+    if (status.operation && !(action === 'hangup' && status.operation === 'answer')) return false;
+    const selected = status.selected === undefined ? status.connected : status.selected;
+    if (action === 'hangup') return selected !== null;
     if (action === 'decline') return status.incoming.length === 1;
-    if (action === 'answer') return status.incoming.length === 1 && status.connected === null;
+    if (action === 'answer') return status.incoming.length === 1 && selected === null;
     return false;
 }
-function bridge(settings, path, method = 'GET', timeout = 1500) {
+function bridge(settings, path, method = 'GET', timeout = 1500, signal) {
     const c = config(settings);
-    if (!['/status', '/answer', '/decline', '/hangup'].includes(path)) throw new Error('Unknown action.');
+    if (!['/status', '/answer', '/decline', '/hangup'].includes(path.split('?')[0])) throw new Error('Unknown action.');
     return new Promise((resolve, reject) => {
-        const req = request({ hostname: '127.0.0.1', port: c.port, path, method,
+        const req = request({ hostname: '127.0.0.1', port: c.port, path, method, signal,
             headers: { Authorization: `Bearer ${c.token}`, Accept: 'application/json' } }, res => {
             let text = '';
             res.setEncoding('utf8');
@@ -55,4 +63,11 @@ function bridge(settings, path, method = 'GET', timeout = 1500) {
         req.end();
     });
 }
-module.exports = { config, validateStatus, available, bridge };
+function newer(current, next) {
+    return !current || !next.session || current.session !== next.session || next.revision >= current.revision;
+}
+function statusPath(status) {
+    return status?.longPoll && typeof status.session === 'string' && Number.isSafeInteger(status.revision)
+        ? `/status?session=${encodeURIComponent(status.session)}&revision=${status.revision}` : '/status';
+}
+module.exports = { config, validateStatus, available, bridge, newer, statusPath };

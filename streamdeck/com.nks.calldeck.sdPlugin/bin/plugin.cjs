@@ -2,7 +2,7 @@
 const WebSocket = require('./ws');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
-const { config, validateStatus, available, bridge } = require('./core.cjs');
+const { config, validateStatus, available, bridge, newer, statusPath } = require('./core.cjs');
 const args = process.argv.slice(2);
 const argument = name => args[args.indexOf(name) + 1];
 const uuid = argument('-pluginUUID');
@@ -15,16 +15,29 @@ const images = JSON.parse(readFileSync(join(__dirname, '../imgs/frames.json'), '
 let settings = null, status = null, lastError = 'Configure the bridge token.', generation = 0;
 let polling = false, busy = false, frame = 0;
 let pollTimer, animationTimer;
+let requestId = 0, appliedId = 0, failures = 0;
+let notified = '';
+let pollController;
+function accept(next, epoch, id) {
+    if (epoch !== generation || !contexts.size || id < appliedId || !newer(status, next)) return false;
+    appliedId = id; status = next; lastError = ''; failures = 0;
+    return true;
+}
 const send = message => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
 const actionName = action => action?.split('.').at(-1);
 function notify(message = lastError) {
+    if (!message) message = status?.error ?? (status?.operation ? `Waiting for Discord: ${status.phase ?? status.operation}.`
+        : ['connecting', 'error', 'unknown'].includes(status?.phase) ? `Discord voice state: ${status.phase}.` : '');
+    const fingerprint = JSON.stringify([message, status?.phase, status?.state]);
+    if (fingerprint === notified) return;
+    notified = fingerprint;
     for (const context of inspectors) send({ event: 'sendToPropertyInspector', context,
         action: contexts.get(context)?.action, payload: { message, state: status?.state ?? 'offline' } });
 }
 function render() {
     for (const [context, key] of contexts) {
         const name = actionName(key.action);
-        const enabled = available(name, status);
+        const enabled = available(name, status) && (name !== 'hangup' || status?.connected !== null);
         const shaking = enabled && status?.incoming.length === 1 && name !== 'hangup';
         const variant = shaking ? `${name}:frame:${frame % images[name].frames.length}`
             : `${name}:${enabled ? 'active' : 'idle'}`;
@@ -51,19 +64,22 @@ async function poll() {
     if (polling || !settings || !contexts.size) return;
     polling = true;
     const epoch = generation;
+    const id = ++requestId, path = statusPath(status);
+    pollController = new AbortController();
     try {
-        const next = validateStatus(await bridge(settings, '/status'));
-        if (epoch === generation) { status = next; lastError = ''; }
+        const next = validateStatus(await bridge(settings, path, 'GET', path === '/status' ? 1500 : 23000, pollController.signal));
+        accept(next, epoch, id);
     } catch (error) {
-        if (epoch === generation) { status = null; lastError = error.message; }
+        if (epoch === generation && id >= appliedId) { appliedId = id; status = null; lastError = error.message; failures++; }
     } finally {
-        polling = false;
+        polling = false; pollController = null;
         updateAnimation(); notify();
-        if (settings && contexts.size) pollTimer = setTimeout(poll, 500);
+        if (settings && contexts.size) pollTimer = setTimeout(poll, failures ? Math.min(5000, 500 * 2 ** Math.min(failures - 1, 4)) : status?.longPoll ? 0 : 500);
     }
 }
 function applySettings(value) {
-    generation++; status = null;
+    generation++; status = null; failures = 0;
+    pollController?.abort();
     try { settings = config(value); lastError = ''; }
     catch (error) { settings = null; lastError = error.message; }
     clearTimeout(pollTimer); updateAnimation(); notify();
@@ -75,11 +91,17 @@ async function press(context) {
     busy = true;
     const epoch = generation, connection = settings, action = actionName(key.action);
     try {
+        const id = ++requestId;
         const fresh = validateStatus(await bridge(connection, '/status'));
-        if (epoch !== generation || !available(action, fresh)) throw new Error('No suitable call for this button.');
+        if (epoch !== generation) throw new Error('Bridge settings changed.');
+        accept(fresh, epoch, id);
+        updateAnimation(); notify();
+        if (!available(action, fresh)) throw new Error('No suitable call for this button.');
         await bridge(connection, `/${action}`, 'POST', 8000);
         if (epoch === generation) {
             // Acknowledgment is dispatch, not proof of voice connection.
+            appliedId = ++requestId;
+            pollController?.abort();
             status = null; updateAnimation();
             send({ event: 'showOk', context }); notify('Command sent. Checking call state…');
         }
@@ -101,10 +123,10 @@ ws.on('message', raw => {
         contexts.set(e.context, { action: e.action }); updateAnimation(); void poll();
     } else if (e.event === 'willDisappear') {
         contexts.delete(e.context); inspectors.delete(e.context);
-        if (!contexts.size) { clearTimeout(pollTimer); status = null; }
+        if (!contexts.size) { generation++; pollController?.abort(); clearTimeout(pollTimer); status = null; }
         updateAnimation();
     } else if (e.event === 'keyDown') void press(e.context);
-    else if (e.event === 'propertyInspectorDidAppear') { inspectors.add(e.context); notify(); }
+    else if (e.event === 'propertyInspectorDidAppear') { inspectors.add(e.context); notified = ''; notify(); }
     else if (e.event === 'propertyInspectorDidDisappear') inspectors.delete(e.context);
     else if (e.event === 'sendToPlugin' && e.payload?.command === 'refresh') {
         send({ event: 'getGlobalSettings', context: uuid }); void poll();

@@ -4,7 +4,7 @@ I wanted proper Answer and Decline buttons for Discord on my Stream Deck. That s
 
 CallDeck lets you answer, decline and hang up calls without Discord's overlay or keyboard shortcuts. It uses a Vencord userplugin and a Stream Deck companion. Answer and Decline animate when a single incoming call is ringing, and Hang Up lights up when you're connected.
 
-It's currently `v0.1.0-alpha`. I've tested all three actions on my Windows setup with official Discord and a custom Vencord build. They work. Group calls and simultaneous incoming calls still need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
+It's currently `v0.1.1-alpha`. All three actions were tested on my Windows setup with official Discord and a custom Vencord build before this state-sync update. The update passes automated tests and build checks, but still needs real-call testing. Group calls and simultaneous incoming calls also need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
 
 ## What you need
 
@@ -115,11 +115,19 @@ Reopen Discord and check the buttons afterward.
 
 It listens on `127.0.0.1` and uses a generated 256-bit password. The endpoints are `GET /status` and `POST /answer`, `/decline` and `/hangup`.
 
-The Stream Deck plugin polls for call status. It sends call actions when you press a button.
+Discord store changes now trigger state snapshots immediately. The Stream Deck plugin waits for changes through authenticated HTTP long polling, using one shared connection for all visible CallDeck keys. A 200 ms renderer loop still delivers commands and reconciles state if a store notification is missed. Older bridges still work through the companion's 500 ms polling fallback.
+
+Hang Up lights up only when Discord's RTC store reports a connected voice transport for the selected channel. Selecting a channel or dispatching Answer isn't enough. While Answer is pending, its rattle stops and the settings inspector reports that CallDeck is waiting for Discord. Hang Up can cancel a selected connection while it is still connecting, even though its icon stays dim.
+
+After a communication failure, the companion clears its displayed call state and retries with a delay capped at five seconds. A restarted bridge uses a new session ID and supplies a fresh snapshot. Duplicate or older snapshots cannot overwrite a newer button check. The bridge keeps a dispatched action pending until Discord confirms its effect or a ten-second confirmation window expires. Timeout outcomes are uncertain; check Discord before retrying.
+
+The port, token, action endpoints and artwork are unchanged. Update both the Vencord plugin and the Stream Deck companion to get RTC confirmation and long polling. See [STATESYNC.md](STATESYNC.md) for the architecture, protocol and remaining limitations.
 
 Answer refuses multiple incoming calls and won't pull you out of another voice channel. Decline asks Discord to stop ringing for you. Hang Up disconnects the current voice channel, including a server voice channel.
 
 A successful response means the command was dispatched. It doesn't confirm that the voice connection has finished connecting.
+
+For a real incoming-call test, have a friend or a second Discord account call yours, then press Answer while it rings. CallDeck has no self-call endpoint. The PowerShell test script now shows the bridge's rejection reason; `409: No unambiguous target call` means it has no single ringing target to answer. Run the script with `-Action status` to inspect the current snapshot without changing a call.
 
 CallDeck doesn't extract your Discord account token. The bridge password is stored in Vencord and Stream Deck settings without added encryption, so keep those settings out of public uploads.
 
@@ -127,6 +135,7 @@ CallDeck doesn't extract your Discord account token. The bridge password is stor
 
 ```sh
 node --experimental-strip-types --test vencord/tests/bridge.test.ts
+node --experimental-strip-types --test vencord/tests/renderer.test.ts
 node --test streamdeck/tests/plugin.test.cjs
 npx @elgato/cli@1.10.1 validate streamdeck/com.nks.calldeck.sdPlugin
 ```

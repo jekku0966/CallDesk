@@ -1,4 +1,4 @@
-# CallDeck Stream Deck plugin — v0.1.0-alpha
+# CallDeck Stream Deck plugin — v0.1.1-alpha
 
 Three native Stream Deck actions: **Answer**, **Decline**, **Hang Up**. Enter the local bridge token once; the connection is shared across every CallDeck action.
 
@@ -22,9 +22,11 @@ If the action category does not appear, fully quit and restart the Stream Deck a
 | Connected voice channel | Static dim | Animated only if one incoming call | Static bright |
 | Multiple incoming calls | Static dim | Static dim | Bright if connected |
 
-Unavailable buttons show an alert when pressed and send no POST. Each accepted click checks fresh bridge status before dispatch. Repeated clicks while another command is pending are refused.
+Unavailable buttons show an alert when pressed and send no POST. Each click checks fresh bridge status before dispatch. Repeated clicks while another command is pending are refused. Answer stops rattling while its effect is pending. Hang Up stays dim during connection setup but can cancel the selected connection when pressed. Its bright icon requires RTC connection confirmation with the updated bridge.
 
-The plugin polls `GET /status` every 500 ms after each completed request, only while keys are visible. Requests never overlap. Rattles use PNG frames at 10 fps while ringing, with no animation traffic during idle. Connected Hang Up is static; it disconnects the current DM or server voice channel.
+The plugin shares one long-poll `GET /status` across all visible keys. The bridge responds when the state changes or after 20 seconds; the companion immediately waits again. Older bridges fall back to a status request every 500 ms after completion. Only one background status request runs at a time; a click can also request a fresh snapshot. Request ordering and bridge revisions prevent an older response from overwriting that check. Hiding every key cancels the background request.
+
+Communication failures clear the displayed state. Reconnect retries start at 500 ms and increase to a five-second cap. Changed settings cancel the old observer. Restarted bridges use a fresh session and snapshot. Rattles still use the original PNG frames at 10 fps, with no animation traffic during idle. Connected Hang Up is static; it disconnects the current DM or server voice channel.
 
 A green check means the bridge accepted/dispatched the command, not that a voice connection has been established. Confirm voice state in Discord. An action timeout can have an uncertain outcome; check Discord before pressing again.
 
@@ -52,6 +54,6 @@ The installer was created with the official Elgato CLI. Manifest SDK version 2; 
 
 ## Validation
 
-Four automated tests pass: configuration/eligibility, authenticated HTTP/error/timeout behavior, an actual spawned plugin process against simulated Stream Deck WebSocket and bridge HTTP servers, and property-inspector save/status behavior. Checks cover idle/ringing transitions, shared settings, duplicate clicks, unavailable actions, and polling shutdown when keys disappear.
+The companion tests cover configuration/eligibility, authenticated HTTP/error/timeout behavior, spawned plugin processes with simulated Stream Deck and bridge servers, property-inspector settings, stale snapshot rejection, long polling with the real native bridge, pending versus confirmed connections, bridge and companion restarts, shared keys, and shutdown when keys disappear. See [the current validation record](../VALIDATION.md) for results.
 
 Official Elgato CLI validation and packaging passed. Installer contents and animation PNG decoding were checked. On 11 October 2026 the author reported that installation and all three Stream Deck actions (Answer, Decline and Hang Up) work as intended. Hardware animation details and group-call edge cases were not separately documented. These are user-reported results; automated tests do not establish them.

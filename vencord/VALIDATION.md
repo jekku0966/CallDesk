@@ -2,6 +2,8 @@
 
 **Update — 11 October 2026:** the author reports successful Windows installation and live testing of all three Stream Deck actions: Answer, Decline and Hang Up. The record below preserves the earlier packaging checks; see [the current validation record](../VALIDATION.md) for subsequent results.
 
+**Update — 14 October 2026:** store-triggered snapshots, RTC confirmation, long polling and command confirmation guards are covered by 13 native bridge tests and 4 renderer simulation tests. See [the current validation record](../VALIDATION.md) for integration checks and the manual checklist. Earlier live results do not validate this change.
+
 Vencord checkout: `3374b8a9d8f6b051c64204917360293aad7f5d75` (package version 1.15.10).
 Runtime: Node 24.19.0; pnpm 11.25.0.
 

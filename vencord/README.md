@@ -1,4 +1,4 @@
-# CallDeck v0.1.0-alpha
+# CallDeck v0.1.1-alpha
 
 A Vencord userplugin that exposes **Answer / Decline / Hang Up** to Stream Deck through an authenticated local HTTP bridge. No overlay, hotkey emulation or window focus switching. Works by asking the running Discord renderer to perform call actions.
 
@@ -9,8 +9,8 @@ A Vencord userplugin that exposes **Answer / Decline / Hang Up** to Stream Deck 
 Custom plugins require a source build of Vencord; dropping this ZIP into the normal installer does not install it.
 
 1. Follow [Vencord's source installation guide](https://docs.vencord.dev/installing/).
-2. Copy the **callDeck** directory into `Vencord/src/userplugins/callDeck`. The directory must directly contain `index.ts`, `native.ts` and `bridge.ts`.
-3. From the Vencord checkout run:
+2. Copy the **callDeck** directory into `Vencord/src/userplugins/callDeck`. The directory must directly contain `index.ts`, `native.ts`, `bridge.ts` and `state.ts`.
+3. Copy the whole folder, including `state.ts`, then from the Vencord checkout run:
 
    ```powershell
    pnpm install --frozen-lockfile
@@ -51,7 +51,7 @@ Test directly first:
 .\scripts\Invoke-CallDeck.ps1 -Action answer -Token YOUR_GENERATED_TOKEN
 ```
 
-Static PNG and animated GIF button artwork is included in `icons/`; see `icons/README.md`. The companion in `../streamdeck` automatically switches icons by call state. The following HTTP-action instructions are an alternative to that companion. An HTTP action can poll `GET /status` with the same header if it supports response-based display rules. `state` is `idle`, `ringing` or `connected`; `incoming` is an array of ringing DM/group-DM channel IDs, and `connected` is the current voice channel ID or null. Names/messages are not exposed.
+Static PNG and animated GIF button artwork is included in `icons/`; see `icons/README.md`. The companion in `../streamdeck` automatically switches icons by call state. The following HTTP-action instructions are an alternative to that companion. An HTTP action can poll `GET /status` with the same header if it supports response-based display rules. `state` retains `idle`, `ringing` or `connected`; `incoming` is an array of ringing DM/group-DM channel IDs. `connected` is now the RTC-confirmed voice channel ID or null; `selected` is the target channel, which may still be connecting. Names/messages are not exposed. `phase`, `operation`, `error`, `session` and `revision` provide synchronization detail. See [STATESYNC.md](../STATESYNC.md).
 
 ## Behavior
 
@@ -83,7 +83,9 @@ Have a friend call you; no outgoing call is placed automatically by this plugin.
 
 Run `node --experimental-strip-types --test tests/bridge.test.ts` using Node 24+, then copy the plugin into a Vencord checkout and run `pnpm testTsc`, `pnpm build`, `pnpm buildStandalone --disable-updater`. Record exact checkout/client versions and live results. Discord stores and actions are internal and may change.
 
-The plugin uses a small native-to-renderer command queue polled every 200 ms. The server listens only on IPv4 loopback, requires a random 256-bit token, rejects browser Origin/Fetch Metadata and unexpected Host headers, accepts no request bodies, and limits pending actions. This does not protect against other local software that can read your settings. No Discord token is extracted or stored by this plugin; Discord's existing authenticated RestAPI handles decline.
+The plugin uses a small native-to-renderer command queue polled every 200 ms. Discord store change listeners also trigger immediate, serialized exchanges. The renderer retries transient exchange failures with bounded backoff; bridge startup failures also retry. A dispatched action remains guarded until its effect is observed or the ten-second confirmation window expires. Hang Up can cancel an Answer target during connection setup. Awaiting a Discord action is bounded by the command deadline; a timed-out action may still finish inside Discord, so its outcome remains uncertain.
+
+The server listens only on IPv4 loopback, requires a random 256-bit token, rejects browser Origin/Fetch Metadata and unexpected Host headers, accepts no action request bodies, and limits pending actions and status observers. Long polling has the same authentication checks as ordinary status reads. This does not protect against other local software that can read your settings. No Discord token is extracted or stored by this plugin; Discord's existing authenticated RestAPI handles decline.
 
 Public distribution: publish this repository as an **independent userplugin** first. Official Vencord inclusion is a separate review process, not guaranteed. Replace the placeholder author ID `0n` with your public Discord user ID before an upstream submission, follow their contributor rules, and complete live acceptance tests. This archive contains source, not prebuilt Vencord binaries.
 
