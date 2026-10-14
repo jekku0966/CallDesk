@@ -8,9 +8,10 @@ import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, type PluginNative } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { CallStore, ChannelStore, RestAPI, SelectedChannelStore, UserStore } from "@webpack/common";
+import { CallStore, ChannelStore, MessageStore, RestAPI, SelectedChannelStore, UserStore, VoiceStateStore } from "@webpack/common";
 
 import type { Command, Status } from "./bridge";
+import { callDisplay } from "./display";
 import { voiceStatus } from "./state";
 
 const Native = VencordNative.pluginHelpers.CallDeck as PluginNative<typeof import("./native")>;
@@ -39,10 +40,22 @@ function stateChanged() {
 function readStatus(): Status {
     const userId = UserStore.getCurrentUser()?.id;
     if (!userId) return { incoming: [], connected: null, selected: null, voice: "unknown" };
-    return voiceStatus(
+    const status = voiceStatus(
         CallStore.getCalls().filter(call => !call.unavailable && call.ringing.includes(userId) && [1, 3].includes(ChannelStore.getChannel(call.channelId)?.type)).map(call => call.channelId),
         SelectedChannelStore.getVoiceChannelId() ?? null, RTCStore.getChannelId() ?? null, RTCStore.getState()
     );
+    // Identity failures must not break the established call controls or heartbeat.
+    try {
+        status.display = callDisplay(status.incoming, status.selected ?? null, userId, {
+            channel: id => ChannelStore.getChannel(id), user: id => UserStore.getUser(id),
+            voices: id => VoiceStateStore.getVoiceStatesForChannel(id),
+            caller: id => {
+                const messageId = CallStore.getCall(id)?.messageId;
+                return messageId ? MessageStore.getMessage(id, messageId)?.author?.id : undefined;
+            }
+        });
+    } catch { status.display = null; }
+    return status;
 }
 
 async function execute(command: Command) {
@@ -98,7 +111,7 @@ async function startBridge(epoch: number) {
         await Native.startBridge(settings.store.port, settings.store.accessToken);
         if (epoch !== generation) { await Native.stopBridge(); return; }
         running = true;
-        for (const store of [CallStore, SelectedChannelStore, ChannelStore, UserStore, RTCStore]) store.addChangeListener(stateChanged);
+        for (const store of [CallStore, SelectedChannelStore, ChannelStore, UserStore, RTCStore, VoiceStateStore, MessageStore]) store.addChangeListener(stateChanged);
         failures = 0;
         void poll(epoch);
     } catch {
@@ -124,7 +137,7 @@ export default definePlugin({
     stop() {
         ++generation;
         running = false;
-        for (const store of [CallStore, SelectedChannelStore, ChannelStore, UserStore, RTCStore]) store.removeChangeListener(stateChanged);
+        for (const store of [CallStore, SelectedChannelStore, ChannelStore, UserStore, RTCStore, VoiceStateStore, MessageStore]) store.removeChangeListener(stateChanged);
         clearTimeout(timer);
         lifecycle = lifecycle.catch(() => {}).then(() => Native.stopBridge());
     }

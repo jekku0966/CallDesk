@@ -3,6 +3,8 @@ const WebSocket = require('./ws');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { config, validateStatus, available, bridge, newer, statusPath } = require('./core.cjs');
+const { AvatarCache, callerImage } = require('./caller.cjs');
+const avatars = new AvatarCache();
 const args = process.argv.slice(2);
 const argument = name => args[args.indexOf(name) + 1];
 const uuid = argument('-pluginUUID');
@@ -18,6 +20,7 @@ let pollTimer, animationTimer;
 let requestId = 0, appliedId = 0, failures = 0;
 let notified = '';
 let pollController;
+let forceSnapshot = false;
 function accept(next, epoch, id) {
     if (epoch !== generation || !contexts.size || id < appliedId || !newer(status, next)) return false;
     appliedId = id; status = next; lastError = ''; failures = 0;
@@ -38,6 +41,13 @@ function render() {
     for (const [context, key] of contexts) {
         const name = actionName(key.action);
         const enabled = available(name, status) && (name !== 'hangup' || status?.connected !== null);
+        const portrait = name === 'answer' ? callerImage(status, enabled, url => avatars.get(url, () => {
+            if (contexts.size && status?.display?.participants.some(p => p.avatar === url)) render();
+        })) : null;
+        if (portrait) {
+            if (key.image !== portrait) { key.image = portrait; send({ event: 'setImage', context, payload: { target: 0, image: portrait } }); }
+            continue;
+        }
         const shaking = enabled && status?.incoming.length === 1 && name !== 'hangup';
         const variant = shaking ? `${name}:frame:${frame % images[name].frames.length}`
             : `${name}:${enabled ? 'active' : 'idle'}`;
@@ -50,7 +60,7 @@ function render() {
 }
 function updateAnimation() {
     const ringing = status?.incoming.length === 1 && [...contexts.values()].some(key =>
-        actionName(key.action) !== 'hangup' && available(actionName(key.action), status));
+        actionName(key.action) !== 'hangup' && !(actionName(key.action) === 'answer' && status?.display) && available(actionName(key.action), status));
     if (ringing && !animationTimer) {
         frame = 0;
         animationTimer = setInterval(() => { frame++; render(); }, 100);
@@ -64,7 +74,8 @@ async function poll() {
     if (polling || !settings || !contexts.size) return;
     polling = true;
     const epoch = generation;
-    const id = ++requestId, path = statusPath(status);
+    const id = ++requestId, path = forceSnapshot ? '/status' : statusPath(status);
+    forceSnapshot = false;
     pollController = new AbortController();
     try {
         const next = validateStatus(await bridge(settings, path, 'GET', path === '/status' ? 1500 : 23000, pollController.signal));
@@ -102,7 +113,11 @@ async function press(context) {
             // Acknowledgment is dispatch, not proof of voice connection.
             appliedId = ++requestId;
             pollController?.abort();
-            status = null; updateAnimation();
+            // Keep the portrait with explicitly pending feedback; immediately reconcile, never infer connection.
+            forceSnapshot = true;
+            status = status?.display ? { ...status, operation: action,
+                operationChannelId: action === 'hangup' ? (fresh.selected ?? fresh.connected) : fresh.incoming[0] } : null;
+            updateAnimation();
             send({ event: 'showOk', context }); notify('Command sent. Checking call state…');
         }
     } catch (error) {

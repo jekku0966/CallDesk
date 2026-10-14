@@ -8,7 +8,7 @@ body{background:#2d2d2d;color:#ddd;font:13px system-ui;margin:16px}label{display
 <p class="hint">Use the same 64-character token as the Vencord CallDeck plugin. Never use your Discord account token.</p>
 <label for="port">Local port</label><input id="port" type="number" min="1024" max="65535" value="9473">
 <button id="save" disabled>Save &amp; test</button><p id="status">Connecting to Stream Deck…</p>
-<p class="hint">Idle: static dim icons. Incoming call: Answer and Decline rattle. Connected: Hang Up lights up. Clicks are ignored when no suitable call exists.</p>
+<p class="hint">Idle: static dim icons. Incoming call: Answer shows the caller; Decline rattles. Connected: Answer shows call status and Hang Up lights up. Clicks are ignored when no suitable call exists.</p>
 <script>
 let socket, context, action, inspectorUUID;
 const token=document.getElementById('token'), port=document.getElementById('port'), status=document.getElementById('status');

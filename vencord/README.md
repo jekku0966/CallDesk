@@ -1,4 +1,4 @@
-# CallDeck v0.1.1-alpha
+# CallDeck v0.1.2-alpha
 
 A Vencord userplugin that exposes **Answer / Decline / Hang Up** to Stream Deck through an authenticated local HTTP bridge. No overlay, hotkey emulation or window focus switching. Works by asking the running Discord renderer to perform call actions.
 
@@ -9,8 +9,8 @@ A Vencord userplugin that exposes **Answer / Decline / Hang Up** to Stream Deck 
 Custom plugins require a source build of Vencord; dropping this ZIP into the normal installer does not install it.
 
 1. Follow [Vencord's source installation guide](https://docs.vencord.dev/installing/).
-2. Copy the **callDeck** directory into `Vencord/src/userplugins/callDeck`. The directory must directly contain `index.ts`, `native.ts`, `bridge.ts` and `state.ts`.
-3. Copy the whole folder, including `state.ts`, then from the Vencord checkout run:
+2. Copy the **callDeck** directory into `Vencord/src/userplugins/callDeck`. The directory must directly contain `index.ts`, `native.ts`, `bridge.ts`, `state.ts` and `display.ts`.
+3. Copy the whole folder, then from the Vencord checkout run:
 
    ```powershell
    pnpm install --frozen-lockfile
@@ -51,7 +51,7 @@ Test directly first:
 .\scripts\Invoke-CallDeck.ps1 -Action answer -Token YOUR_GENERATED_TOKEN
 ```
 
-Static PNG and animated GIF button artwork is included in `icons/`; see `icons/README.md`. The companion in `../streamdeck` automatically switches icons by call state. The following HTTP-action instructions are an alternative to that companion. An HTTP action can poll `GET /status` with the same header if it supports response-based display rules. `state` retains `idle`, `ringing` or `connected`; `incoming` is an array of ringing DM/group-DM channel IDs. `connected` is now the RTC-confirmed voice channel ID or null; `selected` is the target channel, which may still be connecting. Names/messages are not exposed. `phase`, `operation`, `error`, `session` and `revision` provide synchronization detail. See [STATESYNC.md](../STATESYNC.md).
+Static PNG and animated GIF button artwork is included in `icons/`; see `icons/README.md`. The companion in `../streamdeck` automatically switches icons by call state. The following HTTP-action instructions are an alternative to that companion. An HTTP action can poll `GET /status` with the same header if it supports response-based display rules. `state` retains `idle`, `ringing` or `connected`; `incoming` is an array of ringing DM/group-DM channel IDs. `connected` is the RTC-confirmed voice channel ID or null; `selected` is the target channel, which may still be connecting. The optional `display` field now exposes bounded display names, participant IDs and public avatar URLs to authenticated local clients. Message contents are not exposed. `phase`, `operation`, `operationChannelId`, `error`, `session` and `revision` provide synchronization detail. See [STATESYNC.md](../STATESYNC.md).
 
 ## Behavior
 

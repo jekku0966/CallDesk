@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.2-alpha — 14 October 2026
+
+- The existing Answer key combines caller avatar/name, call status and the Answer control. It stays an Answer control while connecting/connected; Hang Up remains separate.
+- Group calls show up to four actual voice participants with an additional-count badge. Missing identity/pictures use safe placeholders; idle restores the original dim artwork.
+- Authenticated status snapshots add bounded caller metadata and the pending operation's target channel. Message contents and account credentials are not exposed.
+- Public Discord CDN avatars use bounded downloads, an in-memory cache and failure backoff. No bridge authorization/cookies are sent, and redirects are rejected.
+- Existing actions, authentication and Decline/Hang Up artwork remain intact. Copy the whole Vencord plugin folder, including `display.ts`, and update the companion.
+
+This display has automated/rendering checks; live Discord identity and physical Stream Deck rendering still need verification. See [VALIDATION.md](VALIDATION.md).
+
 ## v0.1.1-alpha — 14 October 2026
 
 - Discord store changes trigger immediate state snapshots. The companion uses authenticated HTTP long polling; the renderer keeps its 200 ms command/reconciliation loop.

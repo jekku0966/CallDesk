@@ -1,5 +1,22 @@
 # Validation
 
+## Combined Answer/caller display — 14 October 2026
+
+The `v0.1.2-alpha` update combines identity, status and Answer on the existing key. Checks used Node 24.20.0 and the same upstream Vencord checkout recorded below.
+
+- Native bridge and identity tests: 18 passed, 0 failed.
+- Renderer simulation: 4 passed, 0 failed.
+- Companion rendering/cache/HTTP/process tests: 12 passed, 0 failed.
+- Vencord TypeScript and plugin ESLint: passed with no diagnostics.
+- Desktop and standalone builds with the five CallDeck source files: passed.
+- Elgato CLI 1.10.1 validation and packaging for manifest `0.1.2.0`: passed.
+
+Checks cover DM counterpart identity, actual group/server voice participants, four-portrait bounds, known-initiator fallback without an invented count, identity revision changes, metadata copying, escaped names, pending/connected Answer feedback, unchanged idle artwork, duplicate keys, avatar cache coalescing/backoff/bounds, redirect rejection and oversized/invalid avatar bodies. A real companion process receives simulated identity snapshots and retains the Answer action; pressing it while connected sends no Hang Up command.
+
+Four public Discord default-avatar PNGs were fetched through the production avatar loader without credentials and rendered using the production SVG composer. The enlarged incoming/connecting/connected/group images were inspected. This checks the implemented image composition and public-CDN fetch path, not physical Stream Deck decoding or real caller identity. No real Discord calls were placed.
+
+Manual follow-up: update both components, including `display.ts`, and check incoming DM identity, group participant joins/leaves and `+N`, missing-avatar fallback, rename/avatar changes, connected Answer remaining disabled, and idle/offline restoring the exact dim artwork. Check names at actual key size. Caller metadata uses internal Discord stores and still needs live verification. Avatar CDN access is optional and sends no bridge token or account cookies.
+
 ## State synchronization changes — 14 October 2026
 
 Local checks on Windows using Node 24.20.0, starting from CallDesk commit `194f0cd`:

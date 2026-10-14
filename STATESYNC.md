@@ -47,6 +47,16 @@ Renderer exchanges are serialized. Store changes during an exchange trigger anot
 
 ## Limits and installation
 
+### Combined caller display (v0.1.2-alpha)
+
+The optional `display` snapshot field contains a channel ID, DM/group/server kind, bounded title, up to four participant records (ID, display name, public PNG avatar URL) and the known voice-participant total. Caller metadata is copied and validated in the bridge; identity changes increment the snapshot revision. `operationChannelId` prevents a pending action on one call from being labeled as an action on a different newly ringing caller.
+
+DM identity comes from the channel's recipient. Group/server portraits come from `VoiceStateStore.getVoiceStatesForChannel`, with a matching call-message author's ID used to prioritize a known initiator or provide an incoming fallback. Only the message author's ID is read; message text is never returned. The fallback does not invent a voice-participant count. If identity stores fail, ordinary controls and heartbeat continue with no caller display.
+
+The companion composes SVG images with embedded PNG avatars, escaped/shortened names, status and the Answer symbol. Elgato documents SVG data URLs in [the key image API](https://docs.elgato.com/streamdeck/sdk/guides/keys/). Avatars use an allowlist of Discord CDN hosts and public avatar paths, 128 KiB/256-pixel bounds, no redirected requests, a 2.5-second timeout, up to 32 cached entries, five-minute success caching and 30-second failure backoff. Missing avatars use initials. Authentication headers/cookies are never forwarded to CDN requests. All call commands remain on `127.0.0.1`.
+
+This intentionally adds names and public avatar URLs to the authenticated bridge response; earlier versions exposed only call-state identifiers. It adds no account tokens, external call-control service or disk cache. Avatar CDN access is optional and independent from command availability. Copy all five Vencord plugin files, including `display.ts`, when updating.
+
 Update both components for the new behavior. Copy the entire `vencord/callDeck` folder, rebuild Vencord, and install the newly packed Stream Deck companion. Existing token and port settings work. Artwork and animations are unchanged. The legacy companion can still read updated status; an updated companion can still use an older bridge, but that older bridge cannot provide RTC confirmation or the new pending-action guard.
 
 The confirmation window is ten seconds from acceptance. It limits duplicate requests while an outcome is pending; it cannot guarantee exactly-once Discord execution after a timeout or restart. Underlying Discord actions cannot be canceled by an IPC deadline and may finish later. Check Discord before retrying an uncertain action. Internal store changes, live group-call semantics, sleep/wake and hardware rendering still need manual tests. Existing server voice-channel Hang Up is retained.

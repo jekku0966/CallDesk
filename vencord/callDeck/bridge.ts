@@ -7,10 +7,18 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer, type Server, type ServerResponse } from "node:http";
 
+import type { CallDisplay } from "./display";
+
 export type Action = "answer" | "decline" | "hangup";
-export interface Status { incoming: string[]; connected: string | null; selected?: string | null; voice?: "idle" | "connecting" | "connected" | "error" | "unknown"; }
+export interface Status { incoming: string[]; connected: string | null; selected?: string | null; voice?: "idle" | "connecting" | "connected" | "error" | "unknown"; display?: CallDisplay | null; }
 export interface Command { id: number; action: Action; channelId: string; expires: number; }
 const validId = (id: unknown): id is string => typeof id === "string" && /^\d{1,22}$/.test(id);
+const validDisplay = (d: CallDisplay | null) => d === null || (d && validId(d.channelId) && ["dm", "group", "server"].includes(d.kind)
+    && typeof d.name === "string" && d.name.length <= 80 && Number.isInteger(d.total) && d.total >= 0 && d.total <= 1000
+    && Array.isArray(d.participants) && d.participants.length <= 4 && d.participants.every(p => p && validId(p.id)
+        && typeof p.name === "string" && p.name.length <= 80 && (p.avatar === null || (typeof p.avatar === "string" && p.avatar.length <= 300
+            && /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net)\/(avatars\/\d{1,22}\/[a-zA-Z0-9_]+\.png|embed\/avatars\/[0-5]\.png)(\?size=(64|128|256))?$/.test(p.avatar))))
+    && new Set(d.participants.map(p => p.id)).size === d.participants.length);
 
 export class Bridge {
     private server?: Server;
@@ -30,7 +38,8 @@ export class Bridge {
         const voice = this.status.voice ?? (this.status.connected ? "connected" : "idle");
         const phase = this.operation?.action === "answer" ? "answer-requested" : this.operation?.action === "hangup" ? "disconnecting" : voice;
         return { ...this.status, state: this.status.incoming.length ? "ringing" : voice === "connected" ? "connected" : "idle",
-            phase, operation: this.operation?.action ?? null, error: this.operationError, session: this.session, revision: this.revision, longPoll: true };
+            phase, operation: this.operation?.action ?? null, operationChannelId: this.operation?.channelId ?? null,
+            error: this.operationError, session: this.session, revision: this.revision, longPoll: true };
     }
 
     private flush(code = 200) {
@@ -108,9 +117,11 @@ export class Bridge {
     exchange(status: Status): Command[] {
         if (!status || !Array.isArray(status.incoming) || status.incoming.length > 100 || !status.incoming.every(validId) || !(status.connected === null || validId(status.connected))
             || !(status.selected === undefined || status.selected === null || validId(status.selected))
-            || !(status.voice === undefined || ["idle", "connecting", "connected", "error", "unknown"].includes(status.voice))) throw new Error("Invalid status");
+            || !(status.voice === undefined || ["idle", "connecting", "connected", "error", "unknown"].includes(status.voice))
+            || !(status.display === undefined || validDisplay(status.display))) throw new Error("Invalid status");
         const next: Status = { incoming: [...new Set(status.incoming)].sort(), connected: status.connected,
-            ...(status.selected !== undefined ? { selected: status.selected } : {}), ...(status.voice !== undefined ? { voice: status.voice } : {}) };
+            ...(status.selected !== undefined ? { selected: status.selected } : {}), ...(status.voice !== undefined ? { voice: status.voice } : {}),
+            ...(status.display !== undefined ? { display: status.display === null ? null : { ...status.display, participants: status.display.participants.map(p => ({ ...p })) } } : {}) };
         const changed = JSON.stringify(next) !== JSON.stringify(this.status);
         this.status = next;
         this.heartbeat = Date.now();

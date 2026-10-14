@@ -1,4 +1,4 @@
-# CallDeck Stream Deck plugin — v0.1.1-alpha
+# CallDeck Stream Deck plugin — v0.1.2-alpha
 
 Three native Stream Deck actions: **Answer**, **Decline**, **Hang Up**. Enter the local bridge token once; the connection is shared across every CallDeck action.
 
@@ -18,11 +18,17 @@ If the action category does not appear, fully quit and restart the Stream Deck a
 | State | Answer | Decline | Hang Up |
 | --- | --- | --- | --- |
 | No call / bridge offline | Static dim | Static dim | Static dim |
-| Exactly one incoming call, disconnected | Animated rattle | Animated rattle | Static dim |
-| Connected voice channel | Static dim | Animated only if one incoming call | Static bright |
+| Exactly one incoming call, disconnected | Caller portrait/name/status; press to answer | Animated rattle | Static dim |
+| Connected voice channel | Call identity/status; Answer dimmed | Animated only if one incoming call | Static bright |
 | Multiple incoming calls | Static dim | Static dim | Bright if connected |
 
 Unavailable buttons show an alert when pressed and send no POST. Each click checks fresh bridge status before dispatch. Repeated clicks while another command is pending are refused. Answer stops rattling while its effect is pending. Hang Up stays dim during connection setup but can cancel the selected connection when pressed. Its bright icon requires RTC connection confirmation with the updated bridge.
+
+The Answer key now combines identity, status and the Answer action. DMs show the other person's avatar and name. Groups show up to four voice participants, including you if present, with `+N` for additional participants. A known call-message author can supply a fallback portrait while voice data is unavailable; the plugin does not count that fallback as a confirmed participant. It does not display everyone in the chat as if they were in voice. Group keys show one group name rather than four tiny names. Missing avatars use initials.
+
+After answering, the same key can show Connecting or Connected, but it remains an Answer control and never changes into Hang Up. When idle/offline, it restores the original dim green icon. Decline and Hang Up keep their artwork. Older bridges or missing identity data use the existing icon/rattle fallback.
+
+Names and public avatar URLs travel through the authenticated localhost status response. The companion fetches PNG avatars only from approved Discord CDN hosts, without bridge authorization or cookies, and does not follow redirects. It caches up to 32 avatars in memory for five minutes, backs off failures for 30 seconds, caps each download at 128 KiB and times it out after 2.5 seconds. CDN failure does not prevent call controls from working. Caller pictures are static; Decline retains its ringing animation.
 
 The plugin shares one long-poll `GET /status` across all visible keys. The bridge responds when the state changes or after 20 seconds; the companion immediately waits again. Older bridges fall back to a status request every 500 ms after completion. Only one background status request runs at a time; a click can also request a fresh snapshot. Request ordering and bridge revisions prevent an older response from overwriting that check. Hiding every key cancels the background request.
 
@@ -45,7 +51,7 @@ The bridge token is stored in Stream Deck global settings without added encrypti
 The complete source lives in `com.nks.calldeck.sdPlugin`. The WebSocket dependency (`ws` 8.21.0, MIT) is vendored with its license. No compilation is required.
 
 ```sh
-node --test tests/plugin.test.cjs
+node --test tests/*.test.cjs
 npx @elgato/cli@1.10.1 validate com.nks.calldeck.sdPlugin
 npx @elgato/cli@1.10.1 pack com.nks.calldeck.sdPlugin
 ```

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import { voiceStatus } from '../callDeck/state.ts';
+import { callDisplay } from '../callDeck/display.ts';
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function until(predicate: () => boolean) {
@@ -16,9 +17,11 @@ function harness(t: any) {
     let failures = 0, concurrent = 0, maxConcurrent = 0, hangDecline = false;
     const listeners = new Set<() => void>();
     const store = (methods: any) => ({ ...methods, addChangeListener: (fn: () => void) => listeners.add(fn), removeChangeListener: (fn: () => void) => listeners.delete(fn) });
-    const calls = store({ getCalls: () => state.calls });
+    const calls = store({ getCalls: () => state.calls, getCall: (id: string) => state.calls.find(c => c.channelId === id) });
     const channels = store({ getChannel: (id: string) => ({ type: id === '777' ? 2 : id === '456' ? 3 : 1 }) });
-    const user = store({ getCurrentUser: () => state.user ? { id: state.user } : null });
+    const user = store({ getCurrentUser: () => state.user ? { id: state.user } : null, getUser: () => undefined });
+    const voices = store({ getVoiceStatesForChannel: () => ({}) });
+    const messages = store({ getMessage: () => undefined });
     const selected = store({ getVoiceChannelId: () => state.selected });
     const rtc = store({ getRTCConnection: () => null, getLastRTCConnectionState: () => null, getChannelId: () => state.channel, getState: () => state.rtc });
     const native = {
@@ -31,11 +34,11 @@ function harness(t: any) {
         },
         complete: async (id: number, ok: boolean, uncertain: boolean) => { completions.push({ id, ok, ...(uncertain ? { uncertain } : {}) }); }
     };
-    const env: any = { setTimeout, clearTimeout, Date, Promise, voiceStatus,
+    const env: any = { setTimeout, clearTimeout, Date, Promise, voiceStatus, callDisplay,
         VencordNative: { pluginHelpers: { CallDeck: native } },
         definePluginSettings: () => ({ store: { port: 9473, accessToken: 'a'.repeat(64) } }),
         definePlugin: (plugin: any) => plugin, OptionType: { NUMBER: 1, STRING: 2 }, Logger: class { error() {} },
-        CallStore: calls, ChannelStore: channels, SelectedChannelStore: selected, UserStore: user,
+        CallStore: calls, ChannelStore: channels, SelectedChannelStore: selected, UserStore: user, VoiceStateStore: voices, MessageStore: messages,
         RestAPI: { post: async (value: any) => { declines.push(value); if (hangDecline) await new Promise(() => {}); } },
         findByPropsLazy: (prop: string) => prop === 'selectVoiceChannel'
             ? { selectVoiceChannel: async (id: any) => { selections.push(id); } } : rtc };

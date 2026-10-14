@@ -59,7 +59,7 @@
     "CategoryIcon": "imgs/answer-action",
     "Description": "Answer, decline and hang up through the local CallDeck Vencord bridge.",
     "UUID": "com.nks.calldeck",
-    "Version": "0.1.1.0",
+    "Version": "0.1.2.0",
     "SDKVersion": 2,
     "Software": {
         "MinimumVersion": "6.6"

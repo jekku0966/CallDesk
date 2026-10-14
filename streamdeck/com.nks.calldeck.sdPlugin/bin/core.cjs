@@ -1,5 +1,6 @@
 /* CallDeck — GPL-3.0-or-later */
 const { request } = require('node:http');
+const { validateDisplay } = require('./caller.cjs');
 
 function config(value = {}) {
     const port = Number(value.port ?? 9473);
@@ -20,6 +21,9 @@ function validateStatus(s) {
         || (s.session !== undefined && (typeof s.session !== 'string' || !Number.isSafeInteger(s.revision) || s.revision < 0))) {
         throw new Error('Unexpected bridge synchronization metadata.');
     }
+    if (s.display !== undefined && !validateDisplay(s.display)) throw new Error('Unexpected caller display.');
+    if (s.operationChannelId !== undefined && s.operationChannelId !== null
+        && (typeof s.operationChannelId !== 'string' || !/^\d{1,22}$/.test(s.operationChannelId))) throw new Error('Unexpected operation target.');
     return s;
 }
 function available(action, status) {

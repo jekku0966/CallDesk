@@ -2,9 +2,9 @@
 
 I wanted proper Answer and Decline buttons for Discord on my Stream Deck. That somehow turned into this project.
 
-CallDeck lets you answer, decline and hang up calls without Discord's overlay or keyboard shortcuts. It uses a Vencord userplugin and a Stream Deck companion. Answer and Decline animate when a single incoming call is ringing, and Hang Up lights up when you're connected.
+CallDeck lets you answer, decline and hang up calls without Discord's overlay or keyboard shortcuts. It uses a Vencord userplugin and a Stream Deck companion. Answer shows the caller's profile picture, name and call status. Group calls show up to four participants with a `+N` badge for the rest. Decline animates when a single incoming call is ringing, and Hang Up lights up when you're connected.
 
-It's currently `v0.1.1-alpha`. All three actions were tested on my Windows setup with official Discord and a custom Vencord build before this state-sync update. The update passes automated tests and build checks, but still needs real-call testing. Group calls and simultaneous incoming calls also need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
+It's currently `v0.1.2-alpha`. All three actions were tested on my Windows setup with official Discord and a custom Vencord build before the state-sync and caller-display updates. The updates pass automated tests and build checks, but still need real-call testing. Group calls and simultaneous incoming calls also need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
 
 ## What you need
 
@@ -131,12 +131,21 @@ For a real incoming-call test, have a friend or a second Discord account call yo
 
 CallDeck doesn't extract your Discord account token. The bridge password is stored in Vencord and Stream Deck settings without added encryption, so keep those settings out of public uploads.
 
+## Caller display
+
+The Answer key shows a DM portrait/name or a group grid while a call is incoming or active. It still answers when pressed; it never turns into Hang Up. The Answer symbol dims while pending or connected. When nothing is happening, all three controls return to their original static dim artwork.
+
+Group portraits come from voice-state participants, with up to four shown and a `+N` badge for the rest. If those states are unavailable, a known caller or a group placeholder is shown instead. Names may be shortened to fit the key. Missing pictures fall back to initials.
+
+Update both components and copy the entire Vencord plugin folder, including `display.ts`. The local status response now includes display names and public avatar URLs for authenticated clients. The companion caches public Discord CDN pictures in memory; it sends no bridge token or cookies to that CDN. Pictures are optional: call controls still work if they cannot load.
+
 ## Development
 
 ```sh
 node --experimental-strip-types --test vencord/tests/bridge.test.ts
 node --experimental-strip-types --test vencord/tests/renderer.test.ts
-node --test streamdeck/tests/plugin.test.cjs
+node --experimental-strip-types --test vencord/tests/display.test.ts vencord/tests/display-bridge.test.ts
+node --test streamdeck/tests/*.test.cjs
 npx @elgato/cli@1.10.1 validate streamdeck/com.nks.calldeck.sdPlugin
 ```
 

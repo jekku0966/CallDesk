@@ -53,7 +53,7 @@ test('companion ignores out-of-order reads and an old session after a newer butt
     const env = { __dirname: root + '/bin', process: { argv: ['node', 'plugin', '-pluginUUID', 'test', '-port', '1234'], exit() {} },
         AbortController, setTimeout: fn => { const id = ++timerId; timers.set(id, fn); return id; },
         clearTimeout: id => timers.delete(id), setInterval: () => 1, clearInterval() {},
-        require: name => name === './ws' ? FakeSocket : name === './core.cjs'
+        require: name => name === './ws' ? FakeSocket : name === './caller.cjs' ? require(root + '/bin/caller.cjs') : name === './core.cjs'
             ? { ...core, bridge: (_settings, path) => new Promise(resolve => pending.push({ path, resolve })) } : require(name) };
     vm.runInNewContext(fs.readFileSync(root + '/bin/plugin.cjs', 'utf8'), env);
     const emit = event => socket.handlers.message(JSON.stringify(event));
@@ -236,4 +236,35 @@ test('real bridge long polling shares snapshots, confirms connection and recover
     for (const context of ['answer1','answer2','hangup']) emit({ event: 'willDisappear', context });
     await delay(150); const hiddenRequests = statusRequests; await delay(650);
     assert.equal(statusRequests, hiddenRequests); assert.equal(errors, '');
+});
+
+test('Answer process combines identity with control, shares keys, and restores exact idle artwork', async t => {
+    const display = { channelId:'123', kind:'dm', name:'Alex', participants:[{ id:'456', name:'Alex', avatar:null }], total:1 };
+    let state = { state:'ringing', incoming:['123'], selected:null, connected:null, voice:'idle', display };
+    const posts=[], messages=[];
+    const server=http.createServer((req,res)=>{
+        if(req.method==='POST'){posts.push(req.url); state={...state,operation:'answer',operationChannelId:'123'};res.end('{"ok":true}');}
+        else res.end(JSON.stringify(state));
+    }); server.listen(0,'127.0.0.1'); await once(server,'listening');
+    const wss=new WebSocketServer({port:0,host:'127.0.0.1'}); await once(wss,'listening');
+    const child=spawn(process.execPath,[root+'/bin/plugin.cjs','-port',String(wss.address().port),'-pluginUUID','caller-test','-registerEvent','registerPlugin'],{stdio:['ignore','ignore','pipe']});
+    let errors='';child.stderr.on('data',data=>{errors+=data});
+    t.after(()=>{child.kill();for(const client of wss.clients)client.terminate();wss.close();server.closeAllConnections();server.close()});
+    const [socket]=await once(wss,'connection'); const emit=e=>socket.send(JSON.stringify(e));
+    socket.on('message',raw=>{const m=JSON.parse(String(raw));messages.push(m);if(m.event==='getGlobalSettings')emit({event:'didReceiveGlobalSettings',payload:{settings:{token,port:server.address().port}}})});
+    await until(()=>messages.some(m=>m.event==='registerPlugin'));
+    for(const context of ['one','two'])emit({event:'willAppear',context,action:'com.nks.calldeck.answer'});
+    const last=context=>messages.filter(m=>m.event==='setImage'&&m.context===context).at(-1)?.payload.image;
+    await until(()=>last('one')?.startsWith('data:image/svg+xml'));
+    assert.equal(last('one'),last('two'));
+    assert.match(Buffer.from(last('one').split(',')[1],'base64').toString(),/Alex/);
+    emit({event:'keyDown',context:'one'});await until(()=>posts.length===1);
+    await until(()=>last('one')?.startsWith('data:image/svg+xml')&&Buffer.from(last('one').split(',')[1],'base64').toString().includes('Answering'));
+    assert.deepEqual(posts,['/answer']);
+    state={...state,incoming:[],selected:'123',connected:'123',voice:'connected',operation:null};
+    await until(()=>last('one')?.startsWith('data:image/svg+xml')&&Buffer.from(last('one').split(',')[1],'base64').toString().includes('Connected'));
+    emit({event:'keyDown',context:'one'});await until(()=>messages.some(m=>m.event==='showAlert'));assert.equal(posts.length,1);
+    state={state:'idle',incoming:[],selected:null,connected:null,voice:'idle',display:null};
+    const art=JSON.parse(require('node:fs').readFileSync(root+'/imgs/frames.json','utf8'));
+    await until(()=>last('one')===art.answer.idle);assert.equal(last('two'),art.answer.idle);assert.equal(errors,'');
 });
