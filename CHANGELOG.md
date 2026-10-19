@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.4-alpha — 20 October 2026
+
+- Fix inspector-to-plugin routing: Stream Deck rejected preview/refresh messages sent with the action context. Use the inspector registration UUID, matching the shipped sdpi-components client.
+- Profile preview now reports missing/unsaved device selections, unavailable devices, an already visible profile, and the switch request. Missing plugin replies time out visibly instead of leaving the button silent.
+- Add routing regression checks and preview request/reply coverage. Existing bridge settings and bundled profiles are retained.
+
 ## v0.1.3-alpha — 20 October 2026
 
 - Optional incoming-call switching to bundled Standard/MK.2, Mini, XL, + and Neo profiles, with explicit device selection. It is off by default.

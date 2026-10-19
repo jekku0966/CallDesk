@@ -40,10 +40,16 @@ class IncomingProfiles {
     isVisible(id) { return [...this.visible.values()].some(key => key.device === id); }
     switch(id, payload) { this.send({ event: 'switchToProfile', device: id, payload }); }
     preview() {
+        let requested = 0;
         for (const id of this.options.deviceIds) {
             const profile = PROFILES[this.devices.get(id)];
-            if (profile && !this.owners.has(id) && !this.isVisible(id)) this.switch(id, { profile, page: 0 });
+            if (profile && !this.owners.has(id) && !this.isVisible(id)) { this.switch(id, { profile, page: 0 }); requested++; }
         }
+        if (requested) return 'Profile switch requested. Accept installation in Stream Deck if prompted; use Back to return.';
+        if (!this.options.deviceIds.length) return 'No saved target device. Select a Stream Deck and click Save & test.';
+        if (this.options.deviceIds.some(id => this.isVisible(id))) return 'The CallDeck profile is already visible on a selected device.';
+        if (this.options.deviceIds.some(id => this.owners.has(id))) return 'A call profile switch is already pending. Wait, or use Back on the deck.';
+        return 'No selected supported device is available. Reconnect it, reselect it and Save & test.';
     }
     back(id) { this.drop(id); if (this.isVisible(id)) this.switch(id, {}); }
     lost() {

@@ -62,10 +62,11 @@ test('settings changes and bridge failures cannot cause delayed return from stal
     f.p.configure({autoSwitch:{enabled:false}});f.flush();assert.equal(f.sent.length,1);
 });
 test('explicit setup preview uses only saved supported devices, never acquires automatic return', () => {
-    const f=fixture({enabled:false});f.p.preview();assert.equal(f.sent.length,1);f.appear();
-    f.p.preview();assert.equal(f.sent.length,1);f.p.observe(idle);f.flush();assert.equal(f.sent.length,1);
+    const f=fixture({enabled:false});assert.match(f.p.preview(),/switch requested/);assert.equal(f.sent.length,1);f.appear();
+    assert.match(f.p.preview(),/already visible/);assert.equal(f.sent.length,1);f.p.observe(idle);f.flush();assert.equal(f.sent.length,1);
     f.p.back('deck');assert.deepEqual(f.sent.at(-1).payload,{});
-    f.p.disconnect('deck');f.p.preview();assert.equal(f.sent.length,2);
+    f.p.disconnect('deck');assert.match(f.p.preview(),/No selected supported device/);assert.equal(f.sent.length,2);
+    f.p.configure({});assert.match(f.p.preview(),/No saved target/);
 });
 
 // Read ZIP central-directory records with built-in Node only; validate the actual shipped archives.

@@ -14,12 +14,14 @@ body{background:#2d2d2d;color:#ddd;font:13px system-ui;margin:16px}label{display
 <label for="returnDelay">Return delay (seconds, 0–10)</label><input id="returnDelay" type="number" min="0" max="10" step="0.1" value="1">
 <p class="hint">Leaving the bundled controls cancels automatic return. The SDK cannot report every manual layout change. Choose manual return if you need full control. Calls already ringing at startup/reconnect do not trigger a switch.</p>
 <button id="save" disabled>Save &amp; test</button> <button id="preview" disabled>Open selected call profile</button><p id="status">Connecting to Stream Deck…</p>
+<p id="profileStatus" role="status"></p>
 <p class="hint">Save your device selection, then open the call profile once and accept installation if prompted. Press its Back key to return. Do this before relying on incoming-call switching.</p>
 <p class="hint">Idle: static dim icons. Incoming call: Answer shows the caller; Decline rattles. Connected: Answer shows call status and Hang Up lights up. Clicks are ignored when no suitable call exists.</p>
 <script>
-let socket, context, action, inspectorUUID, globalSettings = {}, availableDevices = [];
+let socket, context, action, inspectorUUID, globalSettings = {}, availableDevices = [], previewTimer;
 const token=document.getElementById('token'), port=document.getElementById('port'), status=document.getElementById('status');
 const auto=document.getElementById('auto'), devices=document.getElementById('devices'), returnMode=document.getElementById('returnMode'), returnDelay=document.getElementById('returnDelay');
+const profileStatus=document.getElementById('profileStatus');
 function showDevices(selected=[]) {
  devices.replaceChildren();
  const ids=new Set();
@@ -27,17 +29,27 @@ function showDevices(selected=[]) {
  for(const id of selected){if(ids.has(id))continue;const option=document.createElement('option');option.value=id;option.textContent='Previously selected device (disconnected)';option.selected=true;devices.appendChild(option)}
 }
 const send=value=>{if(socket?.readyState===1)socket.send(JSON.stringify(value))};
+// Stream Deck routes UI messages using the PI registration UUID (as sdpi-components does),
+// not actionInfo.context. The host maps the message back to the action for the plugin.
+const plugin=(command)=>send({event:'sendToPlugin',action,context:inspectorUUID,payload:{command}});
 window.connectElgatoStreamDeckSocket=(wsPort,uuid,registerEvent,info,actionInfo)=>{
  const details=JSON.parse(actionInfo); context=details.context; action=details.action; inspectorUUID=uuid;
  availableDevices=JSON.parse(info).devices||[];showDevices();
  socket=new WebSocket(`ws://127.0.0.1:${wsPort}`);
  socket.onopen=()=>{send({event:registerEvent,uuid});send({event:'getGlobalSettings',context:uuid});document.getElementById('save').disabled=false;document.getElementById('preview').disabled=false;status.textContent='Ready. Enter the token and save.'};
  socket.onmessage=e=>{let message;try{message=JSON.parse(e.data)}catch{return}
-  if(message.event==='didReceiveGlobalSettings'){const s=message.payload.settings||{};globalSettings=s;token.value=s.token||'';port.value=s.port||9473;auto.checked=s.autoSwitch?.enabled===true;showDevices(s.autoSwitch?.deviceIds||[]);returnMode.value=s.autoSwitch?.returnMode||'after-call';returnDelay.value=(s.autoSwitch?.delayMs??1000)/1000;send({event:'sendToPlugin',action,context,payload:{command:'refresh'}})}
-  else if(message.event==='sendToPropertyInspector'){const p=message.payload;status.textContent=p.message||`Bridge connected — ${p.state}.`}
+  if(message.event==='didReceiveGlobalSettings'){const s=message.payload.settings||{};globalSettings=s;token.value=s.token||'';port.value=s.port||9473;auto.checked=s.autoSwitch?.enabled===true;showDevices(s.autoSwitch?.deviceIds||[]);returnMode.value=s.autoSwitch?.returnMode||'after-call';returnDelay.value=(s.autoSwitch?.delayMs??1000)/1000;plugin('refresh')}
+  else if(message.event==='sendToPropertyInspector'){const p=message.payload;if(p.profilePreview){clearTimeout(previewTimer);profileStatus.textContent=p.message}else{status.textContent=p.message||`Bridge connected — ${p.state}.`}}
  };
 };
-document.getElementById('preview').onclick=()=>send({event:'sendToPlugin',action,context,payload:{command:'previewProfile'}});
+document.getElementById('preview').onclick=()=>{
+ const selected=Array.from(devices.selectedOptions,option=>option.value),saved=globalSettings.autoSwitch?.deviceIds||[];
+ if(!selected.length){profileStatus.textContent='Select a Stream Deck above, then click Save & test first.';return}
+ if(JSON.stringify([...selected].sort())!==JSON.stringify([...saved].sort())){profileStatus.textContent='Device selection changed. Click Save & test before opening the profile.';return}
+ clearTimeout(previewTimer);profileStatus.textContent='Requesting call profile…';
+ previewTimer=setTimeout(()=>{profileStatus.textContent='No response from the CallDeck plugin. Fully quit and restart Stream Deck, then retry.'},5000);
+ plugin('previewProfile');
+};
 document.getElementById('save').onclick=()=>{
  const value=token.value.trim(), number=Number(port.value);
  if(!/^[a-f0-9]{64}$/i.test(value)){status.textContent='Token must contain 64 hexadecimal characters.';return}
@@ -45,8 +57,9 @@ document.getElementById('save').onclick=()=>{
  const selected=Array.from(devices.selectedOptions,option=>option.value), delay=Number(returnDelay.value);
  if(auto.checked&&!selected.length){status.textContent='Select at least one supported Stream Deck.';return}
  if(!Number.isFinite(delay)||delay<0||delay>10){status.textContent='Return delay must be 0–10 seconds.';return}
- send({event:'setGlobalSettings',context:inspectorUUID,payload:{...globalSettings,token:value,port:number,autoSwitch:{enabled:auto.checked,deviceIds:selected,returnMode:returnMode.value,delayMs:Math.round(delay*1000)}}});
- send({event:'sendToPlugin',action,context,payload:{command:'refresh'}});
+ globalSettings={...globalSettings,token:value,port:number,autoSwitch:{enabled:auto.checked,deviceIds:selected,returnMode:returnMode.value,delayMs:Math.round(delay*1000)}};
+ send({event:'setGlobalSettings',context:inspectorUUID,payload:globalSettings});
+ plugin('refresh');
  status.textContent='Saved. Checking bridge…';
 };
 </script></body></html>

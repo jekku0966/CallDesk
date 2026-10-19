@@ -4,7 +4,7 @@ I wanted proper Answer and Decline buttons for Discord on my Stream Deck. That s
 
 CallDeck lets you answer, decline and hang up calls without Discord's overlay or keyboard shortcuts. It uses a Vencord userplugin and a Stream Deck companion. Answer shows the caller's profile picture, name and call status. Group calls show up to four participants with a `+N` badge for the rest. Decline animates when a single incoming call is ringing, and Hang Up lights up when you're connected.
 
-It's currently `v0.1.3-alpha`. All three actions were tested on my Windows setup with official Discord and a custom Vencord build before the state-sync and caller-display updates. The updates pass automated tests and build checks, but still need real-call testing. Group calls and simultaneous incoming calls also need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
+It's currently `v0.1.4-alpha`. All three actions were tested on my Windows setup with official Discord and a custom Vencord build before the state-sync and caller-display updates. The updates pass automated tests and build checks, but still need real-call testing. Group calls and simultaneous incoming calls also need separate testing. The checks are listed in [VALIDATION.md](VALIDATION.md).
 
 ## What you need
 
@@ -86,7 +86,7 @@ Those settings apply to all CallDeck keys. The icons are included and change wit
 
 ## Updating it
 
-For incoming-call automatic switching, install the v0.1.3 Stream Deck companion and follow [the profile setup guide](streamdeck/INCOMING-PROFILES.md). This feature alone needs no Vencord rebuild if you already have the v0.1.2 bridge. It is optional and off by default. It opens a bundled call-control profile; Elgato cannot switch directly to page 2 of your own layout. Return timing and selected devices are configurable. Hardware import and exact page restoration still need live verification.
+For incoming-call automatic switching, install the v0.1.4 Stream Deck companion and follow [the profile setup guide](streamdeck/INCOMING-PROFILES.md). This feature alone needs no Vencord rebuild if you already have the v0.1.2 bridge. It is optional and off by default. It opens a bundled call-control profile; Elgato cannot switch directly to page 2 of your own layout. Return timing and selected devices are configurable. Hardware import and exact page restoration still need live verification.
 
 Discord changes its internals, which can break a custom Vencord build. The install command disables automatic Vencord updates so CallDeck stays included. You'll need to update and rebuild that checkout yourself.
 

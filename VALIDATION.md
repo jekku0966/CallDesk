@@ -1,5 +1,13 @@
 # Validation
 
+## Profile-preview routing hotfix — 20 October 2026
+
+The installed v0.1.3 inspector loaded and reported a connected bridge, but pressing Open selected call profile did nothing. The local Stream Deck log recorded `sendToPlugin` rejected as coming from the wrong context. Its installed sdpi-components client sends UI messages using `propertyInspectorUUID`; CallDeck incorrectly used `actionInfo.context`. This is an observed host rejection and a source comparison, not a guess about device selection.
+
+v0.1.4 routes all UI-to-plugin commands through the inspector registration UUID, while the plugin replies through the host-provided action context. Profile preview has separate feedback and a five-second no-response message. Selecting no target or changing targets without saving produces a local explanation. A successful reply says only that switching was requested; it does not claim the host actually imported/switched the profile.
+
+Regression validation: 44 tests passed on Node 24.20.0, including rejection of incorrect UI context in the inspector simulation and a spawned-plugin preview request/reply. Official Elgato CLI validation/packaging passed for 0.1.4.0. These checks do not establish physical profile import or switching; that remains a live follow-up after installing the hotfix. The installed plugin and user profiles were not modified directly during diagnosis.
+
 ## Incoming-call profiles — 20 October 2026
 
 Base: CallDesk `302fbc9`. Windows automated checks; no real Discord calls or hardware profile switching performed for this update.

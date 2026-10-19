@@ -166,7 +166,8 @@ ws.on('message', raw => {
     else if (e.event === 'sendToPlugin' && e.payload?.command === 'refresh') {
         send({ event: 'getGlobalSettings', context: uuid }); void poll();
     } else if (e.event === 'sendToPlugin' && e.payload?.command === 'previewProfile') {
-        profiles.preview();
+        send({event:'sendToPropertyInspector',action:e.action,context:e.context,
+            payload:{profilePreview:true,message:profiles.preview()}});
     }
 });
 ws.on('error', () => { /* Stream Deck owns startup/restart; never log tokens. */ });

@@ -1,4 +1,4 @@
-# Incoming-call profiles — v0.1.3-alpha
+# Incoming-call profiles — v0.1.4-alpha
 
 CallDeck can show Answer, Decline, Hang Up and Back when a new Discord call rings, even when none of your CallDeck keys are visible. It is off by default. Select which Stream Decks should switch.
 
