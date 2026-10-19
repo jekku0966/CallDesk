@@ -1,5 +1,15 @@
 # Validation
 
+## Profile page references and immediate bridge check — 20 October 2026
+
+The v0.1.4 live import reached the installation prompt, then Stream Deck logged `no pages in umbrella` and `content corrupted` for CallDeck-Plus. Inspection found that the generator used RFC base32hex instead of Elgato's alphabet: Elgato skips U, using V/W for the final two positions. The generated current page began with U, so its folder did not match the umbrella page reference. Three known UUID/folder pairs from the official Lights Out sample confirm the mapping; a test now resolves every shipped page reference to its exact archive entry.
+
+The slow bridge check had a separate source-level cause: refresh reused a status observer that can wait 20 seconds, and identical feedback could be suppressed. Refresh now aborts that observer intentionally, immediately requests `/status`, and forces feedback without claiming an offline failure for the abort.
+
+- 45 tests passed on Node 24.20.0. The process regression refreshes while the real bridge holds an idle long poll and requires an immediate `/status` request and successful feedback within a 1.5-second test deadline.
+- All five final profile archives resolve their visible/default pages using the verified encoding. Official Elgato CLI validation and v0.1.5.0 packaging passed.
+- The successful-import path on physical Stream Deck still needs verification after installing v0.1.5. Earlier manifest validation did not check page reference resolution; the new archive tests close that coverage gap. Existing user layouts and installed plugin files were not edited during diagnosis.
+
 ## Profile-preview routing hotfix — 20 October 2026
 
 The installed v0.1.3 inspector loaded and reported a connected bridge, but pressing Open selected call profile did nothing. The local Stream Deck log recorded `sendToPlugin` rejected as coming from the wrong context. Its installed sdpi-components client sends UI messages using `propertyInspectorUUID`; CallDeck incorrectly used `actionInfo.context`. This is an observed host rejection and a source comparison, not a guess about device selection.

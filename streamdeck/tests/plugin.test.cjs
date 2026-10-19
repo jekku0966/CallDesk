@@ -217,8 +217,16 @@ test('hidden-key monitoring switches once, returns after idle, respects manual d
     socket.on('message',raw=>{const m=JSON.parse(String(raw));messages.push(m);if(m.event==='getGlobalSettings')emit({event:'didReceiveGlobalSettings',payload:{settings}})});
     const switches=()=>messages.filter(m=>m.event==='switchToProfile');
     await until(()=>native.waiters.size===1);
-    let requests=0;native.server.on('request',()=>requests++);
+    let requests=0;const requestedPaths=[];native.server.on('request',req=>{requests++;requestedPaths.push(req.url)});
     await delay(650);assert.equal(requests,0,'one held long poll with no visible keys');
+    emit({event:'willAppear',context:'settings-key',device:'deck',action:'com.nks.calldeck.answer'});
+    emit({event:'propertyInspectorDidAppear',context:'settings-key'});
+    await until(()=>messages.some(m=>m.event==='sendToPropertyInspector'&&m.context==='settings-key'));
+    const beforeRefresh=messages.length;
+    emit({event:'sendToPlugin',context:'settings-key',action:'com.nks.calldeck.answer',payload:{command:'refresh'}});
+    await until(()=>requestedPaths.includes('/status')&&messages.slice(beforeRefresh).some(m=>m.event==='sendToPropertyInspector'&&m.payload.state==='idle'&&!m.payload.message),1500);
+    assert.ok(!messages.slice(beforeRefresh).some(m=>m.payload?.state==='offline'),'intentional long-poll abort must not report bridge offline');
+    emit({event:'willDisappear',context:'settings-key'});
     current={...idle,incoming:['123']};native.exchange(current);
     await until(()=>switches().length===1);
     assert.equal(switches()[0].context,'hidden-test');

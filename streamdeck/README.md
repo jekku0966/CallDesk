@@ -1,4 +1,4 @@
-# CallDeck Stream Deck plugin — v0.1.4-alpha
+# CallDeck Stream Deck plugin — v0.1.5-alpha
 
 Three native Stream Deck actions: **Answer**, **Decline**, **Hang Up**. Enter the local bridge token once; the connection is shared across every CallDeck action.
 

@@ -88,11 +88,11 @@ async function poll() {
         const next = validateStatus(await bridge(settings, path, 'GET', path === '/status' ? 1500 : 23000, pollController.signal));
         accept(next, epoch, id);
     } catch (error) {
-        if (epoch === generation && id >= appliedId) { appliedId = id; status = null; profiles.lost(); lastError = error.message; failures++; }
+        if (!pollController?.signal.aborted && epoch === generation && id >= appliedId) { appliedId = id; status = null; profiles.lost(); lastError = error.message; failures++; }
     } finally {
         polling = false; pollController = null;
         updateAnimation(); notify();
-        if (monitoring()) pollTimer = setTimeout(poll, failures ? Math.min(5000, 500 * 2 ** Math.min(failures - 1, 4)) : status?.longPoll ? 0 : 500);
+        if (monitoring()) pollTimer = setTimeout(poll, forceSnapshot ? 0 : failures ? Math.min(5000, 500 * 2 ** Math.min(failures - 1, 4)) : status?.longPoll ? 0 : 500);
     }
 }
 function applySettings(value) {
@@ -164,7 +164,12 @@ ws.on('message', raw => {
     else if (e.event === 'propertyInspectorDidAppear') { inspectors.add(e.context); notified = ''; notify(); }
     else if (e.event === 'propertyInspectorDidDisappear') inspectors.delete(e.context);
     else if (e.event === 'sendToPlugin' && e.payload?.command === 'refresh') {
-        send({ event: 'getGlobalSettings', context: uuid }); void poll();
+        send({ event: 'getGlobalSettings', context: uuid });
+        // A UI test must bypass the held /status?revision observer and deduped feedback.
+        forceSnapshot = true; notified = '';
+        notify(settings ? 'Checking bridge…' : lastError);
+        pollController?.abort();
+        if (!polling) void poll();
     } else if (e.event === 'sendToPlugin' && e.payload?.command === 'previewProfile') {
         send({event:'sendToPropertyInspector',action:e.action,context:e.context,
             payload:{profilePreview:true,message:profiles.preview()}});

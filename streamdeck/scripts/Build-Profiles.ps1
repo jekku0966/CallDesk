@@ -16,7 +16,8 @@ $models = @(
 )
 function Get-ProfileFolder([string]$uuid) {
     $hex = $uuid.Replace('-', '')
-    $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUV'
+    # Elgato's alphabet skips U and ends in VW, unlike RFC 4648 base32hex.
+    $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTVW'
     $bits = 0; $buffer = 0; $encoded = ''
     for ($i = 0; $i -lt $hex.Length; $i += 2) {
         $buffer = ($buffer -shl 8) -bor [Convert]::ToInt32($hex.Substring($i, 2), 16)

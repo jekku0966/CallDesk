@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.5-alpha — 20 October 2026
+
+- Fix bundled profile page-folder encoding. Elgato's alphabet skips U and ends in VW; using ordinary base32hex produced unresolved pages and the host rejected import with `no pages in umbrella`. Regenerate all five archives.
+- Save & test now interrupts a held long poll and requests an immediate snapshot. Repeated checks force fresh feedback; intentionally aborted observers do not report the bridge offline.
+- Test every archive's page references, pin encoding to three official Elgato export vectors, and verify refresh while a real bridge long poll is held.
+
 ## v0.1.4-alpha — 20 October 2026
 
 - Fix inspector-to-plugin routing: Stream Deck rejected preview/refresh messages sent with the action context. Use the inspector registration UUID, matching the shipped sdpi-components client.

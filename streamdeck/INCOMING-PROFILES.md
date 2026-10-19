@@ -1,4 +1,4 @@
-# Incoming-call profiles — v0.1.4-alpha
+# Incoming-call profiles — v0.1.5-alpha
 
 CallDeck can show Answer, Decline, Hang Up and Back when a new Discord call rings, even when none of your CallDeck keys are visible. It is off by default. Select which Stream Decks should switch.
 
@@ -38,6 +38,8 @@ Only a newly observed single incoming channel triggers switching. Duplicate snap
 An unconfirmed switch expires after five seconds. A late installation can still open the profile, but it earns no automatic return; press Back. Settings changes, device disconnect and plugin restart discard return ownership. Disabling automatic switching while on the call profile leaves Back available.
 
 ## Monitoring and packaging
+
+Use v0.1.5 or newer if installation prompted but no profile appeared: earlier generated archives had invalid page-folder references. Save & test also now checks immediately instead of waiting for the current long poll to finish. Install the updated companion, save the device selection, then open the call profile again; keep your existing token and Vencord setup.
 
 With switching enabled and a selected supported device known to Stream Deck, one authenticated observer runs even with zero visible keys. The updated bridge holds it for up to 20 seconds; older bridges use the existing 500 ms fallback. Failures back off to five seconds. With switching disabled, hiding every key stops monitoring as before. Hidden keys produce no animation or avatar traffic. Call commands remain explicit button presses.
 

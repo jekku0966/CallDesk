@@ -83,6 +83,19 @@ function unzip(file) {
         cursor+=46+len+extra+comment;
     }return files;
 }
+// Independent BigInt conversion, pinned to actual page names in Elgato's Lights Out exports.
+function profileFolder(id) {
+    const alphabet='0123456789ABCDEFGHIJKLMNOPQRSTVW';
+    let n=BigInt('0x'+id.replaceAll('-','')),s='';
+    n<<=2n; // 128 bits, padded to 26 groups of 5.
+    for(let i=0;i<26;i++){s=alphabet[Number(n&31n)]+s;n>>=5n}
+    return s+'Z';
+}
+test('page folder encoding matches official Elgato export vectors, including the nonstandard U/V positions', () => {
+    assert.equal(profileFolder('37aea345-7227-420a-bff0-988d1b05aeaa'),'6VNA6HBI4T10LFWGJ26HM1DEL8Z');
+    assert.equal(profileFolder('75560e74-1759-4cf4-8cfb-91d738b906c4'),'ELB0ST0NB56F937RI7BJHE86OGZ');
+    assert.equal(profileFolder('bbdce7ed-575e-4814-84f2-9110c64648b6'),'NFEEFRANBP41917II48CCHI8MOZ');
+});
 test('every manifest profile ships bounded device-specific controls and a marked Back, with no credentials', () => {
     const path=require('node:path'),root=path.resolve(__dirname,'../com.nks.calldeck.sdPlugin');
     const manifest=require(root+'/manifest.json');
@@ -90,6 +103,9 @@ test('every manifest profile ships bounded device-specific controls and a marked
     for(const profile of manifest.Profiles) {
         assert.equal(profile.Name,PROFILES[profile.DeviceType]);assert.equal(profile.AutoInstall,false);assert.equal(profile.DontAutoSwitchWhenInstalled,true);
         const files=unzip(path.join(root,profile.Name+'.streamDeckProfile'));
+        const [umbrellaPath,umbrella]=[...files].find(([name])=>/^[^/]+\/manifest.json$/.test(name));
+        const prefix=umbrellaPath.slice(0,-'manifest.json'.length);
+        for(const id of [...umbrella.Pages.Pages,umbrella.Pages.Default])assert.ok(files.has(prefix+'Profiles/'+profileFolder(id)+'/manifest.json'),'every referenced page must resolve to its actual folder');
         const page=[...files.values()].find(v=>v.Controllers&&Object.keys(v.Controllers[0].Actions).length);
         assert.ok(page);assert.equal(files.size,3);
         const actions=page.Controllers[0].Actions;assert.deepEqual(Object.keys(actions),['0,0','1,0','2,0','0,1']);
