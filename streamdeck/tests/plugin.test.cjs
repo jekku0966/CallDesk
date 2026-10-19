@@ -53,7 +53,7 @@ test('companion ignores out-of-order reads and an old session after a newer butt
     const env = { __dirname: root + '/bin', process: { argv: ['node', 'plugin', '-pluginUUID', 'test', '-port', '1234'], exit() {} },
         AbortController, setTimeout: fn => { const id = ++timerId; timers.set(id, fn); return id; },
         clearTimeout: id => timers.delete(id), setInterval: () => 1, clearInterval() {},
-        require: name => name === './ws' ? FakeSocket : name === './caller.cjs' ? require(root + '/bin/caller.cjs') : name === './core.cjs'
+        require: name => name === './ws' ? FakeSocket : name === './profiles.cjs' ? require(root + '/bin/profiles.cjs') : name === './caller.cjs' ? require(root + '/bin/caller.cjs') : name === './core.cjs'
             ? { ...core, bridge: (_settings, path) => new Promise(resolve => pending.push({ path, resolve })) } : require(name) };
     vm.runInNewContext(fs.readFileSync(root + '/bin/plugin.cjs', 'utf8'), env);
     const emit = event => socket.handlers.message(JSON.stringify(event));
@@ -158,7 +158,8 @@ test('Stream Deck process: registration, shared settings, idle/ringing frames, b
 test('property inspector shares validated settings using its registration ID', () => {
     const fs = require('node:fs'), vm = require('node:vm');
     const script = fs.readFileSync(root + '/ui/settings.html', 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-    const elements = Object.fromEntries(['token','port','status','save'].map(id => [id, { value:'', textContent:'', disabled:true }]));
+    const elements = Object.fromEntries(['token','port','status','save','preview','auto','devices','returnMode','returnDelay'].map(id => [id, { value:'', textContent:'', disabled:true, checked:false, selectedOptions:[], replaceChildren() {}, appendChild() {} }]));
+    elements.returnMode.value='after-call'; elements.returnDelay.value='1';
     const messages=[]; let socket;
     const env={ document:{ getElementById:id=>elements[id] }, window:{}, WebSocket:class {
         constructor() { socket=this;this.readyState=1; } send(text) { messages.push(JSON.parse(text)); }
@@ -169,11 +170,55 @@ test('property inspector shares validated settings using its registration ID', (
     socket.onopen();
     elements.token.value=token;elements.port.value='9473';elements.save.onclick();
     const saved=messages.find(m=>m.event==='setGlobalSettings');
-    assert.equal(saved.context,'pi-registration');assert.deepEqual(saved.payload,{token,port:9473});
+    assert.equal(saved.context,'pi-registration');assert.deepEqual(saved.payload,{token,port:9473,autoSwitch:{enabled:false,deviceIds:[],returnMode:'after-call',delayMs:1000}});
     elements.token.value='bad';elements.save.onclick();
     assert.equal(messages.filter(m=>m.event==='setGlobalSettings').length,1);
     socket.onmessage({data:JSON.stringify({event:'sendToPropertyInspector',payload:{state:'ringing',message:''}})});
     assert.equal(elements.status.textContent,'Bridge connected — ringing.');
+    elements.token.value=token;elements.auto.checked=true;elements.devices.selectedOptions=[];elements.save.onclick();
+    assert.match(elements.status.textContent,/Select at least one/);
+    elements.devices.selectedOptions=[{value:'deck'}];elements.returnDelay.value='2.5';elements.returnMode.value='manual';elements.save.onclick();
+    assert.deepEqual(messages.filter(m=>m.event==='setGlobalSettings').at(-1).payload.autoSwitch,
+        {enabled:true,deviceIds:['deck'],returnMode:'manual',delayMs:2500});
+});
+
+test('hidden-key monitoring switches once, returns after idle, respects manual departure and stops when disabled', async t => {
+    const { Bridge } = await import('../../vencord/callDeck/bridge.ts');
+    const probe=http.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');
+    const bridgePort=probe.address().port;await new Promise(resolve=>probe.close(resolve));
+    const native=new Bridge();await native.start(bridgePort,token);
+    const idle={incoming:[],connected:null,selected:null,voice:'idle'};
+    native.exchange(idle);
+    const heartbeat=setInterval(()=>native.exchange(current),50);let current=idle;
+    const wss=new WebSocketServer({port:0,host:'127.0.0.1'});await once(wss,'listening');
+    const child=spawn(process.execPath,[root+'/bin/plugin.cjs','-port',String(wss.address().port),'-pluginUUID','hidden-test',
+        '-registerEvent','registerPlugin','-info',JSON.stringify({devices:[{id:'deck',type:0}]})],{stdio:['ignore','ignore','pipe']});
+    let errors='';child.stderr.on('data',d=>{errors+=d});
+    t.after(async()=>{clearInterval(heartbeat);child.kill();for(const client of wss.clients)client.terminate();wss.close();await native.stop()});
+    const [socket]=await once(wss,'connection'),messages=[];
+    const settings={token,port:bridgePort,autoSwitch:{enabled:true,deviceIds:['deck'],returnMode:'after-call',delayMs:50}};
+    const emit=e=>socket.send(JSON.stringify(e));
+    socket.on('message',raw=>{const m=JSON.parse(String(raw));messages.push(m);if(m.event==='getGlobalSettings')emit({event:'didReceiveGlobalSettings',payload:{settings}})});
+    const switches=()=>messages.filter(m=>m.event==='switchToProfile');
+    await until(()=>native.waiters.size===1);
+    let requests=0;native.server.on('request',()=>requests++);
+    await delay(650);assert.equal(requests,0,'one held long poll with no visible keys');
+    current={...idle,incoming:['123']};native.exchange(current);
+    await until(()=>switches().length===1);
+    assert.equal(switches()[0].context,'hidden-test');
+    emit({event:'willAppear',context:'bundled',device:'deck',action:'com.nks.calldeck.answer',payload:{settings:{autoProfile:'calldeck-incoming-v1'}}});
+    await delay(150);assert.equal(switches().length,1);
+    current={...idle,selected:'123',voice:'connecting'};native.exchange(current);await delay(150);assert.equal(switches().length,1);
+    current=idle;native.exchange(current);await until(()=>switches().length===2);
+    assert.deepEqual(switches()[1].payload,{});
+    emit({event:'willDisappear',context:'bundled'});
+    current={...idle,incoming:['456']};native.exchange(current);await until(()=>switches().length===3);
+    emit({event:'willAppear',context:'bundled2',device:'deck',action:'com.nks.calldeck.answer',payload:{settings:{autoProfile:'calldeck-incoming-v1'}}});
+    emit({event:'willDisappear',context:'bundled2'});
+    current=idle;native.exchange(current);await delay(200);assert.equal(switches().length,3,'manual departure cancels return');
+    emit({event:'didReceiveGlobalSettings',payload:{settings:{...settings,autoSwitch:{...settings.autoSwitch,enabled:false}}}});
+    await until(()=>native.waiters.size===0);current={...idle,incoming:['789']};native.exchange(current);await delay(200);
+    assert.equal(switches().length,3);assert.equal(errors,'');
 });
 
 test('real bridge long polling shares snapshots, confirms connection and recovers across restarts', async t => {

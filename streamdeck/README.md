@@ -1,4 +1,4 @@
-# CallDeck Stream Deck plugin — v0.1.2-alpha
+# CallDeck Stream Deck plugin — v0.1.3-alpha
 
 Three native Stream Deck actions: **Answer**, **Decline**, **Hang Up**. Enter the local bridge token once; the connection is shared across every CallDeck action.
 
@@ -15,6 +15,8 @@ If the action category does not appear, fully quit and restart the Stream Deck a
 
 ## Button behavior
 
+Optional incoming-call automatic switching is available in any CallDeck key's settings. It opens a bundled profile with Answer, Decline, Hang Up and Back, including while your normal keys are hidden. Choose target devices, return timing and delay. Follow [the setup/update guide](INCOMING-PROFILES.md) before enabling it. Elgato does not allow jumping to a page of an arbitrary user profile. Automatic switching is off by default.
+
 | State | Answer | Decline | Hang Up |
 | --- | --- | --- | --- |
 | No call / bridge offline | Static dim | Static dim | Static dim |
@@ -30,7 +32,7 @@ After answering, the same key can show Connecting or Connected, but it remains a
 
 Names and public avatar URLs travel through the authenticated localhost status response. The companion fetches PNG avatars only from approved Discord CDN hosts, without bridge authorization or cookies, and does not follow redirects. It caches up to 32 avatars in memory for five minutes, backs off failures for 30 seconds, caps each download at 128 KiB and times it out after 2.5 seconds. CDN failure does not prevent call controls from working. Caller pictures are static; Decline retains its ringing animation.
 
-The plugin shares one long-poll `GET /status` across all visible keys. The bridge responds when the state changes or after 20 seconds; the companion immediately waits again. Older bridges fall back to a status request every 500 ms after completion. Only one background status request runs at a time; a click can also request a fresh snapshot. Request ordering and bridge revisions prevent an older response from overwriting that check. Hiding every key cancels the background request.
+The plugin shares one long-poll `GET /status` across all keys. The bridge responds when the state changes or after 20 seconds; the companion immediately waits again. Older bridges fall back to a status request every 500 ms after completion. Only one background status request runs at a time; a click can also request a fresh snapshot. Request ordering and bridge revisions prevent an older response from overwriting that check. Hiding every key cancels the background request unless automatic switching is enabled for a selected supported device. Animation still stops while keys are hidden.
 
 Communication failures clear the displayed state. Reconnect retries start at 500 ms and increase to a five-second cap. Changed settings cancel the old observer. Restarted bridges use a fresh session and snapshot. Rattles still use the original PNG frames at 10 fps, with no animation traffic during idle. Connected Hang Up is static; it disconnects the current DM or server voice channel.
 
@@ -52,6 +54,7 @@ The complete source lives in `com.nks.calldeck.sdPlugin`. The WebSocket dependen
 
 ```sh
 node --test tests/*.test.cjs
+powershell.exe -NoProfile -File scripts/Build-Profiles.ps1
 npx @elgato/cli@1.10.1 validate com.nks.calldeck.sdPlugin
 npx @elgato/cli@1.10.1 pack com.nks.calldeck.sdPlugin
 ```
