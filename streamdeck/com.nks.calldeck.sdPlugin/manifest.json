@@ -51,6 +51,25 @@
                 }
             ],
             "UserTitleEnabled": false
+        },
+        {
+            "UUID": "com.nks.calldeck.return",
+            "Name": "Back to previous layout",
+            "Icon": "imgs/back",
+            "Tooltip": "Return from the bundled CallDeck profile",
+            "Controllers": [
+                "Keypad"
+            ],
+            "SupportedInMultiActions": false,
+            "States": [
+                {
+                    "ShowTitle": true,
+                    "Title": "Back",
+                    "TitleAlignment": "bottom",
+                    "Image": "imgs/back"
+                }
+            ],
+            "UserTitleEnabled": false
         }
     ],
     "Author": "NKS",
@@ -59,7 +78,7 @@
     "CategoryIcon": "imgs/answer-action",
     "Description": "Answer, decline and hang up through the local CallDeck Vencord bridge.",
     "UUID": "com.nks.calldeck",
-    "Version": "0.1.2.0",
+    "Version": "0.1.5.0",
     "SDKVersion": 2,
     "Software": {
         "MinimumVersion": "6.6"
@@ -75,5 +94,42 @@
     ],
     "CodePath": "bin/plugin.cjs",
     "Icon": "imgs/plugin",
-    "PropertyInspectorPath": "ui/settings.html"
+    "PropertyInspectorPath": "ui/settings.html",
+    "Profiles": [
+        {
+            "DeviceType": 0,
+            "Name": "profiles/CallDeck-Standard",
+            "AutoInstall": false,
+            "Readonly": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "DeviceType": 1,
+            "Name": "profiles/CallDeck-Mini",
+            "AutoInstall": false,
+            "Readonly": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "DeviceType": 2,
+            "Name": "profiles/CallDeck-XL",
+            "AutoInstall": false,
+            "Readonly": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "DeviceType": 7,
+            "Name": "profiles/CallDeck-Plus",
+            "AutoInstall": false,
+            "Readonly": false,
+            "DontAutoSwitchWhenInstalled": true
+        },
+        {
+            "DeviceType": 9,
+            "Name": "profiles/CallDeck-Neo",
+            "AutoInstall": false,
+            "Readonly": false,
+            "DontAutoSwitchWhenInstalled": true
+        }
+    ]
 }

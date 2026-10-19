@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.1.5-alpha — 20 October 2026
+
+- Fix bundled profile page-folder encoding. Elgato's alphabet skips U and ends in VW; using ordinary base32hex produced unresolved pages and the host rejected import with `no pages in umbrella`. Regenerate all five archives.
+- Save & test now interrupts a held long poll and requests an immediate snapshot. Repeated checks force fresh feedback; intentionally aborted observers do not report the bridge offline.
+- Test every archive's page references, pin encoding to three official Elgato export vectors, and verify refresh while a real bridge long poll is held.
+
+## v0.1.4-alpha — 20 October 2026
+
+- Fix inspector-to-plugin routing: Stream Deck rejected preview/refresh messages sent with the action context. Use the inspector registration UUID, matching the shipped sdpi-components client.
+- Profile preview now reports missing/unsaved device selections, unavailable devices, an already visible profile, and the switch request. Missing plugin replies time out visibly instead of leaving the button silent.
+- Add routing regression checks and preview request/reply coverage. Existing bridge settings and bundled profiles are retained.
+
+## v0.1.3-alpha — 20 October 2026
+
+- Optional incoming-call switching to bundled Standard/MK.2, Mini, XL, + and Neo profiles, with explicit device selection. It is off by default.
+- One bridge observer continues while all keys are hidden when this feature is enabled; hidden keys generate no animation traffic.
+- Only new single incoming calls trigger a switch. Repeated snapshots and restart baselines do not steal the deck repeatedly.
+- Configurable return after call end, after ringing stops, or manually with Back; delay 0–10 seconds. Visible marked controls confirm ownership, and leaving them cancels automatic return.
+- Setup preview handles profile installation before a real call. Package includes five credential-free profiles and a reproducible PowerShell generator.
+- Existing Vencord source, bridge protocol, authentication and call commands are unchanged. Existing v0.1.2 custom Vencord installations need only the companion update.
+
+Elgato permits bundled profiles, not arbitrary user-profile pages. Exact restoration and profile import require hardware checks; see [setup](streamdeck/INCOMING-PROFILES.md) and [validation](VALIDATION.md).
+
 ## v0.1.2-alpha — 14 October 2026
 
 - The existing Answer key combines caller avatar/name, call status and the Answer control. It stays an Answer control while connecting/connected; Hang Up remains separate.

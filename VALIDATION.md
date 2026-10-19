@@ -1,5 +1,51 @@
 # Validation
 
+## Profile page references and immediate bridge check — 20 October 2026
+
+The v0.1.4 live import reached the installation prompt, then Stream Deck logged `no pages in umbrella` and `content corrupted` for CallDeck-Plus. Inspection found that the generator used RFC base32hex instead of Elgato's alphabet: Elgato skips U, using V/W for the final two positions. The generated current page began with U, so its folder did not match the umbrella page reference. Three known UUID/folder pairs from the official Lights Out sample confirm the mapping; a test now resolves every shipped page reference to its exact archive entry.
+
+The slow bridge check had a separate source-level cause: refresh reused a status observer that can wait 20 seconds, and identical feedback could be suppressed. Refresh now aborts that observer intentionally, immediately requests `/status`, and forces feedback without claiming an offline failure for the abort.
+
+- 45 tests passed on Node 24.20.0. The process regression refreshes while the real bridge holds an idle long poll and requires an immediate `/status` request and successful feedback within a 1.5-second test deadline.
+- All five final profile archives resolve their visible/default pages using the verified encoding. Official Elgato CLI validation and v0.1.5.0 packaging passed.
+- The successful-import path on physical Stream Deck still needs verification after installing v0.1.5. Earlier manifest validation did not check page reference resolution; the new archive tests close that coverage gap. Existing user layouts and installed plugin files were not edited during diagnosis.
+
+## Profile-preview routing hotfix — 20 October 2026
+
+The installed v0.1.3 inspector loaded and reported a connected bridge, but pressing Open selected call profile did nothing. The local Stream Deck log recorded `sendToPlugin` rejected as coming from the wrong context. Its installed sdpi-components client sends UI messages using `propertyInspectorUUID`; CallDeck incorrectly used `actionInfo.context`. This is an observed host rejection and a source comparison, not a guess about device selection.
+
+v0.1.4 routes all UI-to-plugin commands through the inspector registration UUID, while the plugin replies through the host-provided action context. Profile preview has separate feedback and a five-second no-response message. Selecting no target or changing targets without saving produces a local explanation. A successful reply says only that switching was requested; it does not claim the host actually imported/switched the profile.
+
+Regression validation: 44 tests passed on Node 24.20.0, including rejection of incorrect UI context in the inspector simulation and a spawned-plugin preview request/reply. Official Elgato CLI validation/packaging passed for 0.1.4.0. These checks do not establish physical profile import or switching; that remains a live follow-up after installing the hotfix. The installed plugin and user profiles were not modified directly during diagnosis.
+
+## Incoming-call profiles — 20 October 2026
+
+Base: CallDesk `302fbc9`. Windows automated checks; no real Discord calls or hardware profile switching performed for this update.
+
+- Node 24.20.0: 44 bridge, renderer, caller-display, companion and profile tests passed, 0 failed. This includes a real companion process and native Bridge exchanging snapshots with zero visible keys, one held idle long poll, one switch per new ring, confirmed return, manual departure and disabled-feature shutdown.
+- Stream Deck's bundled Node 20.20.2: 13 JavaScript feature/caller tests plus the spawned-companion process test passed. TypeScript bridge imports require Node 24 and were excluded from the successful Node 20 compatibility run. An earlier broad Node 20 attempt failed only on those unsupported imports; the full Node 24 suite passed.
+- Nine profile tests passed again against the final generated archives. They inspect every registered ZIP for the four expected marked controls, bounded coordinates, matching device registration and absence of bridge credentials in action settings.
+- Windows PowerShell 5.1 generator: passed after explicitly loading both ZIP assemblies. Two separate runs produce identical SHA-256 hashes for all five archives. Early generator checks caught assembly-loading and JSON-argument issues; both were corrected before packaging.
+- Official Elgato CLI 1.10.1: final manifest/resource validation and packaging passed. The installer includes all five profiles, the profile controller, Back icon and updated inspector. Minimum Stream Deck remains 6.6, which introduced `Profiles[].AutoInstall`; page selection was introduced in 6.5.
+- Vencord plugin source and bridge protocol are unchanged. Regression tests passed; upstream Vencord TypeScript/lint/desktop builds were not rerun because there are no Vencord changes.
+
+The sandbox blocks localhost/network access and CLI cache writes. Successful network/process checks and CLI runs used the approved execution environment. No installed Discord/Vencord or Stream Deck configuration was changed, and no account or bridge token was read from it.
+
+SDK constraints were checked against the current official [profiles guide](https://docs.elgato.com/streamdeck/sdk/guides/profiles/), [switch command](https://docs.elgato.com/streamdeck/sdk/references/websocket/plugin/#switchtoprofile), [manifest reference](https://docs.elgato.com/streamdeck/sdk/references/manifest/) and [API changelog](https://docs.elgato.com/streamdeck/sdk/references/websocket/changelog/). The archive structure was inspected in Elgato's official Lights Out sample. Installed Elgato default archives supplied model IDs only; no user layout was copied.
+
+The SDK documents returning to the previous profile by omitting the profile and retaining a previous page by omitting the page. Tests verify the exact command and cancellation rules, not the host's hardware behavior. There is no general profile-change event or switch acknowledgment; visibility markers are a conservative inference. No CPU/memory benchmark was performed.
+
+### Live follow-up
+
+- [ ] Install/update the companion, preview/import the correct device profile, and press Back. Confirm no installation prompt remains for the first real call.
+- [ ] From your normal page 1 and page 3, test incoming DM → Decline, missed call, and Answer → Hang Up. Record the exact returned profile/page/folder.
+- [ ] Navigate away manually during ringing, during a call and during the return delay; verify no forced return or repeated switch. Try manual re-entry too.
+- [ ] Test all three return modes, delay limits, multiple devices, simultaneous incoming calls and an existing server voice connection.
+- [ ] Test Discord/bridge and Stream Deck restart, wrong token, offline recovery, sleep/wake, unplug/replug and profile installation delayed beyond five seconds.
+- [ ] Verify icons and layout on the physical device. Record Stream Deck/Discord/Vencord versions with results.
+
+Update/install instructions are in [incoming-call profiles](streamdeck/INCOMING-PROFILES.md). The feature remains opt-in pending these hardware checks.
+
 ## Combined Answer/caller display — 14 October 2026
 
 The `v0.1.2-alpha` update combines identity, status and Answer on the existing key. Checks used Node 24.20.0 and the same upstream Vencord checkout recorded below.

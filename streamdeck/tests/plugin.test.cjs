@@ -53,7 +53,7 @@ test('companion ignores out-of-order reads and an old session after a newer butt
     const env = { __dirname: root + '/bin', process: { argv: ['node', 'plugin', '-pluginUUID', 'test', '-port', '1234'], exit() {} },
         AbortController, setTimeout: fn => { const id = ++timerId; timers.set(id, fn); return id; },
         clearTimeout: id => timers.delete(id), setInterval: () => 1, clearInterval() {},
-        require: name => name === './ws' ? FakeSocket : name === './caller.cjs' ? require(root + '/bin/caller.cjs') : name === './core.cjs'
+        require: name => name === './ws' ? FakeSocket : name === './profiles.cjs' ? require(root + '/bin/profiles.cjs') : name === './caller.cjs' ? require(root + '/bin/caller.cjs') : name === './core.cjs'
             ? { ...core, bridge: (_settings, path) => new Promise(resolve => pending.push({ path, resolve })) } : require(name) };
     vm.runInNewContext(fs.readFileSync(root + '/bin/plugin.cjs', 'utf8'), env);
     const emit = event => socket.handlers.message(JSON.stringify(event));
@@ -155,25 +155,99 @@ test('Stream Deck process: registration, shared settings, idle/ringing frames, b
     await delay(1700); const count=requests.length; await delay(650); assert.equal(requests.length,count);
     assert.equal(stderr, '');
 });
-test('property inspector shares validated settings using its registration ID', () => {
+test('property inspector routes commands through its registration ID and reports preview results', () => {
     const fs = require('node:fs'), vm = require('node:vm');
     const script = fs.readFileSync(root + '/ui/settings.html', 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-    const elements = Object.fromEntries(['token','port','status','save'].map(id => [id, { value:'', textContent:'', disabled:true }]));
-    const messages=[]; let socket;
-    const env={ document:{ getElementById:id=>elements[id] }, window:{}, WebSocket:class {
-        constructor() { socket=this;this.readyState=1; } send(text) { messages.push(JSON.parse(text)); }
+    const elements = Object.fromEntries(['token','port','status','profileStatus','save','preview','auto','devices','returnMode','returnDelay'].map(id => [id, { value:'', textContent:'', disabled:true, checked:false, selectedOptions:[], replaceChildren() {}, appendChild() {} }]));
+    elements.returnMode.value='after-call'; elements.returnDelay.value='1';
+    const messages=[],timers=new Map(); let socket,timerId=0;
+    const env={ document:{ getElementById:id=>elements[id],createElement:()=>({}) }, window:{},
+        setTimeout:fn=>{timers.set(++timerId,fn);return timerId},clearTimeout:id=>timers.delete(id), WebSocket:class {
+        constructor() { socket=this;this.readyState=1; } send(text) {
+            const m=JSON.parse(text);
+            if(m.event==='sendToPlugin') assert.equal(m.context,'pi-registration','Stream Deck rejects messages sent with actionInfo.context');
+            messages.push(m);
+        }
     }};
     vm.runInNewContext(script,env);
     env.window.connectElgatoStreamDeckSocket('1234','pi-registration','registerPropertyInspector','{}',
         JSON.stringify({ context:'answer-context', action:'com.nks.calldeck.answer' }));
     socket.onopen();
+    elements.preview.onclick();assert.match(elements.profileStatus.textContent,/Select a Stream Deck/);
     elements.token.value=token;elements.port.value='9473';elements.save.onclick();
     const saved=messages.find(m=>m.event==='setGlobalSettings');
-    assert.equal(saved.context,'pi-registration');assert.deepEqual(saved.payload,{token,port:9473});
+    assert.equal(saved.context,'pi-registration');assert.deepEqual(saved.payload,{token,port:9473,autoSwitch:{enabled:false,deviceIds:[],returnMode:'after-call',delayMs:1000}});
     elements.token.value='bad';elements.save.onclick();
     assert.equal(messages.filter(m=>m.event==='setGlobalSettings').length,1);
     socket.onmessage({data:JSON.stringify({event:'sendToPropertyInspector',payload:{state:'ringing',message:''}})});
     assert.equal(elements.status.textContent,'Bridge connected — ringing.');
+    elements.token.value=token;elements.auto.checked=true;elements.devices.selectedOptions=[];elements.save.onclick();
+    assert.match(elements.status.textContent,/Select at least one/);
+    elements.devices.selectedOptions=[{value:'deck'}];elements.returnDelay.value='2.5';elements.returnMode.value='manual';elements.save.onclick();
+    assert.deepEqual(messages.filter(m=>m.event==='setGlobalSettings').at(-1).payload.autoSwitch,
+        {enabled:true,deviceIds:['deck'],returnMode:'manual',delayMs:2500});
+    elements.preview.onclick();
+    assert.equal(messages.at(-1).payload.command,'previewProfile');assert.equal(messages.at(-1).action,'com.nks.calldeck.answer');
+    assert.equal(timers.size,1);
+    socket.onmessage({data:JSON.stringify({event:'sendToPropertyInspector',payload:{profilePreview:true,message:'Profile switch requested.'}})});
+    assert.equal(elements.profileStatus.textContent,'Profile switch requested.');assert.equal(timers.size,0);
+    elements.devices.selectedOptions=[{value:'other'}];elements.preview.onclick();assert.match(elements.profileStatus.textContent,/selection changed/);
+    elements.devices.selectedOptions=[{value:'deck'}];elements.preview.onclick();for(const fn of timers.values())fn();
+    assert.match(elements.profileStatus.textContent,/No response/);
+    socket.onmessage({data:JSON.stringify({event:'didReceiveGlobalSettings',payload:{settings:{token,port:9473,autoSwitch:{deviceIds:['deck']}}}})});
+    assert.equal(messages.at(-1).payload.command,'refresh');
+});
+
+test('hidden-key monitoring switches once, returns after idle, respects manual departure and stops when disabled', async t => {
+    const { Bridge } = await import('../../vencord/callDeck/bridge.ts');
+    const probe=http.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');
+    const bridgePort=probe.address().port;await new Promise(resolve=>probe.close(resolve));
+    const native=new Bridge();await native.start(bridgePort,token);
+    const idle={incoming:[],connected:null,selected:null,voice:'idle'};
+    native.exchange(idle);
+    const heartbeat=setInterval(()=>native.exchange(current),50);let current=idle;
+    const wss=new WebSocketServer({port:0,host:'127.0.0.1'});await once(wss,'listening');
+    const child=spawn(process.execPath,[root+'/bin/plugin.cjs','-port',String(wss.address().port),'-pluginUUID','hidden-test',
+        '-registerEvent','registerPlugin','-info',JSON.stringify({devices:[{id:'deck',type:0}]})],{stdio:['ignore','ignore','pipe']});
+    let errors='';child.stderr.on('data',d=>{errors+=d});
+    t.after(async()=>{clearInterval(heartbeat);child.kill();for(const client of wss.clients)client.terminate();wss.close();await native.stop()});
+    const [socket]=await once(wss,'connection'),messages=[];
+    const settings={token,port:bridgePort,autoSwitch:{enabled:true,deviceIds:['deck'],returnMode:'after-call',delayMs:50}};
+    const emit=e=>socket.send(JSON.stringify(e));
+    socket.on('message',raw=>{const m=JSON.parse(String(raw));messages.push(m);if(m.event==='getGlobalSettings')emit({event:'didReceiveGlobalSettings',payload:{settings}})});
+    const switches=()=>messages.filter(m=>m.event==='switchToProfile');
+    await until(()=>native.waiters.size===1);
+    let requests=0;const requestedPaths=[];native.server.on('request',req=>{requests++;requestedPaths.push(req.url)});
+    await delay(650);assert.equal(requests,0,'one held long poll with no visible keys');
+    emit({event:'willAppear',context:'settings-key',device:'deck',action:'com.nks.calldeck.answer'});
+    emit({event:'propertyInspectorDidAppear',context:'settings-key'});
+    await until(()=>messages.some(m=>m.event==='sendToPropertyInspector'&&m.context==='settings-key'));
+    const beforeRefresh=messages.length;
+    emit({event:'sendToPlugin',context:'settings-key',action:'com.nks.calldeck.answer',payload:{command:'refresh'}});
+    await until(()=>requestedPaths.includes('/status')&&messages.slice(beforeRefresh).some(m=>m.event==='sendToPropertyInspector'&&m.payload.state==='idle'&&!m.payload.message),1500);
+    assert.ok(!messages.slice(beforeRefresh).some(m=>m.payload?.state==='offline'),'intentional long-poll abort must not report bridge offline');
+    emit({event:'willDisappear',context:'settings-key'});
+    current={...idle,incoming:['123']};native.exchange(current);
+    await until(()=>switches().length===1);
+    assert.equal(switches()[0].context,'hidden-test');
+    emit({event:'willAppear',context:'bundled',device:'deck',action:'com.nks.calldeck.answer',payload:{settings:{autoProfile:'calldeck-incoming-v1'}}});
+    await delay(150);assert.equal(switches().length,1);
+    current={...idle,selected:'123',voice:'connecting'};native.exchange(current);await delay(150);assert.equal(switches().length,1);
+    current=idle;native.exchange(current);await until(()=>switches().length===2);
+    assert.deepEqual(switches()[1].payload,{});
+    emit({event:'willDisappear',context:'bundled'});
+    current={...idle,incoming:['456']};native.exchange(current);await until(()=>switches().length===3);
+    emit({event:'willAppear',context:'bundled2',device:'deck',action:'com.nks.calldeck.answer',payload:{settings:{autoProfile:'calldeck-incoming-v1'}}});
+    emit({event:'willDisappear',context:'bundled2'});
+    current=idle;native.exchange(current);await delay(200);assert.equal(switches().length,3,'manual departure cancels return');
+    emit({event:'didReceiveGlobalSettings',payload:{settings:{...settings,autoSwitch:{...settings.autoSwitch,enabled:false}}}});
+    await until(()=>native.waiters.size===0);current={...idle,incoming:['789']};native.exchange(current);await delay(200);
+    assert.equal(switches().length,3);assert.equal(errors,'');
+    emit({event:'sendToPlugin',action:'com.nks.calldeck.answer',context:'settings-key',payload:{command:'previewProfile'}});
+    await until(()=>switches().length===4&&messages.some(m=>m.payload?.profilePreview));
+    const reply=messages.find(m=>m.payload?.profilePreview);
+    assert.equal(reply.context,'settings-key');assert.equal(reply.action,'com.nks.calldeck.answer');
+    assert.match(reply.payload.message,/switch requested/);
 });
 
 test('real bridge long polling shares snapshots, confirms connection and recovers across restarts', async t => {
